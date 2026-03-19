@@ -1,0 +1,626 @@
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 1
+
+
+   1              		.cpu cortex-m4
+   2              		.arch armv7e-m
+   3              		.fpu fpv4-sp-d16
+   4              		.eabi_attribute 27, 1
+   5              		.eabi_attribute 28, 1
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.file	"freertos.c"
+  16              		.text
+  17              	.Ltext0:
+  18              		.cfi_sections	.debug_frame
+  19              		.section	.text.StartMeasureTask,"ax",%progbits
+  20              		.align	1
+  21              		.global	StartMeasureTask
+  22              		.syntax unified
+  23              		.thumb
+  24              		.thumb_func
+  26              	StartMeasureTask:
+  27              	.LVL0:
+  28              	.LFB244:
+  29              		.file 1 "Core/Src/freertos.c"
+   1:Core/Src/freertos.c **** /* USER CODE BEGIN Header */
+   2:Core/Src/freertos.c **** /**
+   3:Core/Src/freertos.c ****   ******************************************************************************
+   4:Core/Src/freertos.c ****   * File Name          : freertos.c
+   5:Core/Src/freertos.c ****   * Description        : Code for freertos applications
+   6:Core/Src/freertos.c ****   ******************************************************************************
+   7:Core/Src/freertos.c ****   * @attention
+   8:Core/Src/freertos.c ****   *
+   9:Core/Src/freertos.c ****   * Copyright (c) 2026 STMicroelectronics.
+  10:Core/Src/freertos.c ****   * All rights reserved.
+  11:Core/Src/freertos.c ****   *
+  12:Core/Src/freertos.c ****   * This software is licensed under terms that can be found in the LICENSE file
+  13:Core/Src/freertos.c ****   * in the root directory of this software component.
+  14:Core/Src/freertos.c ****   * If no LICENSE file comes with this software, it is provided AS-IS.
+  15:Core/Src/freertos.c ****   *
+  16:Core/Src/freertos.c ****   ******************************************************************************
+  17:Core/Src/freertos.c ****   */
+  18:Core/Src/freertos.c **** /* USER CODE END Header */
+  19:Core/Src/freertos.c **** 
+  20:Core/Src/freertos.c **** /* Includes ------------------------------------------------------------------*/
+  21:Core/Src/freertos.c **** #include "FreeRTOS.h"
+  22:Core/Src/freertos.c **** #include "task.h"
+  23:Core/Src/freertos.c **** #include "main.h"
+  24:Core/Src/freertos.c **** #include "cmsis_os.h"
+  25:Core/Src/freertos.c **** 
+  26:Core/Src/freertos.c **** /* Private includes ----------------------------------------------------------*/
+  27:Core/Src/freertos.c **** /* USER CODE BEGIN Includes */
+  28:Core/Src/freertos.c **** #include "app_display.h"
+  29:Core/Src/freertos.c **** #include "app_key.h"
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 2
+
+
+  30:Core/Src/freertos.c **** #include "app_measure.h"
+  31:Core/Src/freertos.c **** 
+  32:Core/Src/freertos.c **** /* USER CODE END Includes */
+  33:Core/Src/freertos.c **** 
+  34:Core/Src/freertos.c **** /* Private typedef -----------------------------------------------------------*/
+  35:Core/Src/freertos.c **** /* USER CODE BEGIN PTD */
+  36:Core/Src/freertos.c **** 
+  37:Core/Src/freertos.c **** /* USER CODE END PTD */
+  38:Core/Src/freertos.c **** 
+  39:Core/Src/freertos.c **** /* Private define ------------------------------------------------------------*/
+  40:Core/Src/freertos.c **** /* USER CODE BEGIN PD */
+  41:Core/Src/freertos.c **** 
+  42:Core/Src/freertos.c **** /* USER CODE END PD */
+  43:Core/Src/freertos.c **** 
+  44:Core/Src/freertos.c **** /* Private macro -------------------------------------------------------------*/
+  45:Core/Src/freertos.c **** /* USER CODE BEGIN PM */
+  46:Core/Src/freertos.c **** 
+  47:Core/Src/freertos.c **** /* USER CODE END PM */
+  48:Core/Src/freertos.c **** 
+  49:Core/Src/freertos.c **** /* Private variables ---------------------------------------------------------*/
+  50:Core/Src/freertos.c **** /* USER CODE BEGIN Variables */
+  51:Core/Src/freertos.c **** 
+  52:Core/Src/freertos.c **** /* USER CODE END Variables */
+  53:Core/Src/freertos.c **** /* Definitions for Task_Measure */
+  54:Core/Src/freertos.c **** osThreadId_t Task_MeasureHandle;
+  55:Core/Src/freertos.c **** const osThreadAttr_t Task_Measure_attributes = {
+  56:Core/Src/freertos.c ****   .name = "Task_Measure",
+  57:Core/Src/freertos.c ****   .stack_size = 512 * 4,
+  58:Core/Src/freertos.c ****   .priority = (osPriority_t) osPriorityHigh,
+  59:Core/Src/freertos.c **** };
+  60:Core/Src/freertos.c **** /* Definitions for Task_Display */
+  61:Core/Src/freertos.c **** osThreadId_t Task_DisplayHandle;
+  62:Core/Src/freertos.c **** const osThreadAttr_t Task_Display_attributes = {
+  63:Core/Src/freertos.c ****   .name = "Task_Display",
+  64:Core/Src/freertos.c ****   .stack_size = 512 * 4,
+  65:Core/Src/freertos.c ****   .priority = (osPriority_t) osPriorityNormal,
+  66:Core/Src/freertos.c **** };
+  67:Core/Src/freertos.c **** /* Definitions for Task_Key */
+  68:Core/Src/freertos.c **** osThreadId_t Task_KeyHandle;
+  69:Core/Src/freertos.c **** const osThreadAttr_t Task_Key_attributes = {
+  70:Core/Src/freertos.c ****   .name = "Task_Key",
+  71:Core/Src/freertos.c ****   .stack_size = 256 * 4,
+  72:Core/Src/freertos.c ****   .priority = (osPriority_t) osPriorityLow,
+  73:Core/Src/freertos.c **** };
+  74:Core/Src/freertos.c **** /* Definitions for Queue_Cmd */
+  75:Core/Src/freertos.c **** osMessageQueueId_t Queue_CmdHandle;
+  76:Core/Src/freertos.c **** const osMessageQueueAttr_t Queue_Cmd_attributes = {
+  77:Core/Src/freertos.c ****   .name = "Queue_Cmd"
+  78:Core/Src/freertos.c **** };
+  79:Core/Src/freertos.c **** /* Definitions for Mutex_Result */
+  80:Core/Src/freertos.c **** osMutexId_t Mutex_ResultHandle;
+  81:Core/Src/freertos.c **** const osMutexAttr_t Mutex_Result_attributes = {
+  82:Core/Src/freertos.c ****   .name = "Mutex_Result"
+  83:Core/Src/freertos.c **** };
+  84:Core/Src/freertos.c **** 
+  85:Core/Src/freertos.c **** /* Private function prototypes -----------------------------------------------*/
+  86:Core/Src/freertos.c **** /* USER CODE BEGIN FunctionPrototypes */
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 3
+
+
+  87:Core/Src/freertos.c **** 
+  88:Core/Src/freertos.c **** /* USER CODE END FunctionPrototypes */
+  89:Core/Src/freertos.c **** 
+  90:Core/Src/freertos.c **** void StartMeasureTask(void *argument);
+  91:Core/Src/freertos.c **** void StartDisplayTask(void *argument);
+  92:Core/Src/freertos.c **** void StartKeyTask(void *argument);
+  93:Core/Src/freertos.c **** 
+  94:Core/Src/freertos.c **** void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
+  95:Core/Src/freertos.c **** 
+  96:Core/Src/freertos.c **** /**
+  97:Core/Src/freertos.c ****   * @brief  FreeRTOS initialization
+  98:Core/Src/freertos.c ****   * @param  None
+  99:Core/Src/freertos.c ****   * @retval None
+ 100:Core/Src/freertos.c ****   */
+ 101:Core/Src/freertos.c **** void MX_FREERTOS_Init(void) {
+ 102:Core/Src/freertos.c ****   /* USER CODE BEGIN Init */
+ 103:Core/Src/freertos.c **** 
+ 104:Core/Src/freertos.c ****   /* USER CODE END Init */
+ 105:Core/Src/freertos.c ****   /* Create the mutex(es) */
+ 106:Core/Src/freertos.c ****   /* creation of Mutex_Result */
+ 107:Core/Src/freertos.c ****   Mutex_ResultHandle = osMutexNew(&Mutex_Result_attributes);
+ 108:Core/Src/freertos.c **** 
+ 109:Core/Src/freertos.c ****   /* USER CODE BEGIN RTOS_MUTEX */
+ 110:Core/Src/freertos.c ****   /* add mutexes, ... */
+ 111:Core/Src/freertos.c ****   /* USER CODE END RTOS_MUTEX */
+ 112:Core/Src/freertos.c **** 
+ 113:Core/Src/freertos.c ****   /* USER CODE BEGIN RTOS_SEMAPHORES */
+ 114:Core/Src/freertos.c ****   /* add semaphores, ... */
+ 115:Core/Src/freertos.c ****   /* USER CODE END RTOS_SEMAPHORES */
+ 116:Core/Src/freertos.c **** 
+ 117:Core/Src/freertos.c ****   /* USER CODE BEGIN RTOS_TIMERS */
+ 118:Core/Src/freertos.c ****   /* start timers, add new ones, ... */
+ 119:Core/Src/freertos.c ****   /* USER CODE END RTOS_TIMERS */
+ 120:Core/Src/freertos.c **** 
+ 121:Core/Src/freertos.c ****   /* Create the queue(s) */
+ 122:Core/Src/freertos.c ****   /* creation of Queue_Cmd */
+ 123:Core/Src/freertos.c ****   Queue_CmdHandle = osMessageQueueNew (16, sizeof(uint8_t), &Queue_Cmd_attributes);
+ 124:Core/Src/freertos.c **** 
+ 125:Core/Src/freertos.c ****   /* USER CODE BEGIN RTOS_QUEUES */
+ 126:Core/Src/freertos.c ****   /* add queues, ... */
+ 127:Core/Src/freertos.c ****   /* USER CODE END RTOS_QUEUES */
+ 128:Core/Src/freertos.c **** 
+ 129:Core/Src/freertos.c ****   /* Create the thread(s) */
+ 130:Core/Src/freertos.c ****   /* creation of Task_Measure */
+ 131:Core/Src/freertos.c ****   Task_MeasureHandle = osThreadNew(StartMeasureTask, NULL, &Task_Measure_attributes);
+ 132:Core/Src/freertos.c **** 
+ 133:Core/Src/freertos.c ****   /* creation of Task_Display */
+ 134:Core/Src/freertos.c ****   Task_DisplayHandle = osThreadNew(StartDisplayTask, NULL, &Task_Display_attributes);
+ 135:Core/Src/freertos.c **** 
+ 136:Core/Src/freertos.c ****   /* creation of Task_Key */
+ 137:Core/Src/freertos.c ****   Task_KeyHandle = osThreadNew(StartKeyTask, NULL, &Task_Key_attributes);
+ 138:Core/Src/freertos.c **** 
+ 139:Core/Src/freertos.c ****   /* USER CODE BEGIN RTOS_THREADS */
+ 140:Core/Src/freertos.c ****   /* add threads, ... */
+ 141:Core/Src/freertos.c ****   /* USER CODE END RTOS_THREADS */
+ 142:Core/Src/freertos.c **** 
+ 143:Core/Src/freertos.c ****   /* USER CODE BEGIN RTOS_EVENTS */
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 4
+
+
+ 144:Core/Src/freertos.c ****   /* add events, ... */
+ 145:Core/Src/freertos.c ****   /* USER CODE END RTOS_EVENTS */
+ 146:Core/Src/freertos.c **** 
+ 147:Core/Src/freertos.c **** }
+ 148:Core/Src/freertos.c **** 
+ 149:Core/Src/freertos.c **** /* USER CODE BEGIN Header_StartMeasureTask */
+ 150:Core/Src/freertos.c **** /**
+ 151:Core/Src/freertos.c ****   * @brief  Function implementing the Task_Measure thread.
+ 152:Core/Src/freertos.c ****   * @param  argument: Not used
+ 153:Core/Src/freertos.c ****   * @retval None
+ 154:Core/Src/freertos.c ****   */
+ 155:Core/Src/freertos.c **** /* USER CODE END Header_StartMeasureTask */
+ 156:Core/Src/freertos.c **** void StartMeasureTask(void *argument)
+ 157:Core/Src/freertos.c **** {
+  30              		.loc 1 157 1 view -0
+  31              		.cfi_startproc
+  32              		@ Volatile: function does not return.
+  33              		@ args = 0, pretend = 0, frame = 0
+  34              		@ frame_needed = 0, uses_anonymous_args = 0
+  35              		.loc 1 157 1 is_stmt 0 view .LVU1
+  36 0000 08B5     		push	{r3, lr}
+  37              	.LCFI0:
+  38              		.cfi_def_cfa_offset 8
+  39              		.cfi_offset 3, -8
+  40              		.cfi_offset 14, -4
+ 158:Core/Src/freertos.c ****   /* USER CODE BEGIN StartMeasureTask */
+ 159:Core/Src/freertos.c ****   App_Measure_Init();
+  41              		.loc 1 159 3 is_stmt 1 view .LVU2
+  42 0002 FFF7FEFF 		bl	App_Measure_Init
+  43              	.LVL1:
+  44              	.L2:
+ 160:Core/Src/freertos.c ****   /* Infinite loop */
+ 161:Core/Src/freertos.c ****   for(;;)
+  45              		.loc 1 161 3 discriminator 1 view .LVU3
+ 162:Core/Src/freertos.c ****   {
+ 163:Core/Src/freertos.c ****     App_Measure_Run();
+  46              		.loc 1 163 5 discriminator 1 view .LVU4
+  47 0006 FFF7FEFF 		bl	App_Measure_Run
+  48              	.LVL2:
+ 161:Core/Src/freertos.c ****   {
+  49              		.loc 1 161 8 discriminator 1 view .LVU5
+  50 000a FCE7     		b	.L2
+  51              		.cfi_endproc
+  52              	.LFE244:
+  54              		.section	.text.StartDisplayTask,"ax",%progbits
+  55              		.align	1
+  56              		.global	StartDisplayTask
+  57              		.syntax unified
+  58              		.thumb
+  59              		.thumb_func
+  61              	StartDisplayTask:
+  62              	.LVL3:
+  63              	.LFB245:
+ 164:Core/Src/freertos.c ****   }
+ 165:Core/Src/freertos.c ****   /* USER CODE END StartMeasureTask */
+ 166:Core/Src/freertos.c **** }
+ 167:Core/Src/freertos.c **** 
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 5
+
+
+ 168:Core/Src/freertos.c **** /* USER CODE BEGIN Header_StartDisplayTask */
+ 169:Core/Src/freertos.c **** /**
+ 170:Core/Src/freertos.c **** * @brief Function implementing the Task_Display thread.
+ 171:Core/Src/freertos.c **** * @param argument: Not used
+ 172:Core/Src/freertos.c **** * @retval None
+ 173:Core/Src/freertos.c **** */
+ 174:Core/Src/freertos.c **** /* USER CODE END Header_StartDisplayTask */
+ 175:Core/Src/freertos.c **** void StartDisplayTask(void *argument)
+ 176:Core/Src/freertos.c **** {
+  64              		.loc 1 176 1 view -0
+  65              		.cfi_startproc
+  66              		@ Volatile: function does not return.
+  67              		@ args = 0, pretend = 0, frame = 0
+  68              		@ frame_needed = 0, uses_anonymous_args = 0
+  69              		.loc 1 176 1 is_stmt 0 view .LVU7
+  70 0000 08B5     		push	{r3, lr}
+  71              	.LCFI1:
+  72              		.cfi_def_cfa_offset 8
+  73              		.cfi_offset 3, -8
+  74              		.cfi_offset 14, -4
+ 177:Core/Src/freertos.c ****   /* USER CODE BEGIN StartDisplayTask */
+ 178:Core/Src/freertos.c ****   App_Display_Init();
+  75              		.loc 1 178 3 is_stmt 1 view .LVU8
+  76 0002 FFF7FEFF 		bl	App_Display_Init
+  77              	.LVL4:
+  78              	.L5:
+ 179:Core/Src/freertos.c ****   /* Infinite loop */
+ 180:Core/Src/freertos.c ****   for(;;)
+  79              		.loc 1 180 3 discriminator 1 view .LVU9
+ 181:Core/Src/freertos.c ****   {
+ 182:Core/Src/freertos.c ****     App_Display_Run();
+  80              		.loc 1 182 5 discriminator 1 view .LVU10
+  81 0006 FFF7FEFF 		bl	App_Display_Run
+  82              	.LVL5:
+ 180:Core/Src/freertos.c ****   {
+  83              		.loc 1 180 8 discriminator 1 view .LVU11
+  84 000a FCE7     		b	.L5
+  85              		.cfi_endproc
+  86              	.LFE245:
+  88              		.section	.text.StartKeyTask,"ax",%progbits
+  89              		.align	1
+  90              		.global	StartKeyTask
+  91              		.syntax unified
+  92              		.thumb
+  93              		.thumb_func
+  95              	StartKeyTask:
+  96              	.LVL6:
+  97              	.LFB246:
+ 183:Core/Src/freertos.c ****   }
+ 184:Core/Src/freertos.c ****   /* USER CODE END StartDisplayTask */
+ 185:Core/Src/freertos.c **** }
+ 186:Core/Src/freertos.c **** 
+ 187:Core/Src/freertos.c **** /* USER CODE BEGIN Header_StartKeyTask */
+ 188:Core/Src/freertos.c **** /**
+ 189:Core/Src/freertos.c **** * @brief Function implementing the Task_Key thread.
+ 190:Core/Src/freertos.c **** * @param argument: Not used
+ 191:Core/Src/freertos.c **** * @retval None
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 6
+
+
+ 192:Core/Src/freertos.c **** */
+ 193:Core/Src/freertos.c **** /* USER CODE END Header_StartKeyTask */
+ 194:Core/Src/freertos.c **** void StartKeyTask(void *argument)
+ 195:Core/Src/freertos.c **** {
+  98              		.loc 1 195 1 view -0
+  99              		.cfi_startproc
+ 100              		@ Volatile: function does not return.
+ 101              		@ args = 0, pretend = 0, frame = 0
+ 102              		@ frame_needed = 0, uses_anonymous_args = 0
+ 103              		.loc 1 195 1 is_stmt 0 view .LVU13
+ 104 0000 08B5     		push	{r3, lr}
+ 105              	.LCFI2:
+ 106              		.cfi_def_cfa_offset 8
+ 107              		.cfi_offset 3, -8
+ 108              		.cfi_offset 14, -4
+ 196:Core/Src/freertos.c ****   /* USER CODE BEGIN StartKeyTask */
+ 197:Core/Src/freertos.c ****   App_Key_Init();
+ 109              		.loc 1 197 3 is_stmt 1 view .LVU14
+ 110 0002 FFF7FEFF 		bl	App_Key_Init
+ 111              	.LVL7:
+ 112              	.L8:
+ 198:Core/Src/freertos.c ****   /* Infinite loop */
+ 199:Core/Src/freertos.c ****   for(;;)
+ 113              		.loc 1 199 3 discriminator 1 view .LVU15
+ 200:Core/Src/freertos.c ****   {
+ 201:Core/Src/freertos.c ****     App_Key_Run();
+ 114              		.loc 1 201 5 discriminator 1 view .LVU16
+ 115 0006 FFF7FEFF 		bl	App_Key_Run
+ 116              	.LVL8:
+ 199:Core/Src/freertos.c ****   {
+ 117              		.loc 1 199 8 discriminator 1 view .LVU17
+ 118 000a FCE7     		b	.L8
+ 119              		.cfi_endproc
+ 120              	.LFE246:
+ 122              		.section	.text.MX_FREERTOS_Init,"ax",%progbits
+ 123              		.align	1
+ 124              		.global	MX_FREERTOS_Init
+ 125              		.syntax unified
+ 126              		.thumb
+ 127              		.thumb_func
+ 129              	MX_FREERTOS_Init:
+ 130              	.LFB243:
+ 101:Core/Src/freertos.c ****   /* USER CODE BEGIN Init */
+ 131              		.loc 1 101 29 view -0
+ 132              		.cfi_startproc
+ 133              		@ args = 0, pretend = 0, frame = 0
+ 134              		@ frame_needed = 0, uses_anonymous_args = 0
+ 135 0000 08B5     		push	{r3, lr}
+ 136              	.LCFI3:
+ 137              		.cfi_def_cfa_offset 8
+ 138              		.cfi_offset 3, -8
+ 139              		.cfi_offset 14, -4
+ 107:Core/Src/freertos.c **** 
+ 140              		.loc 1 107 3 view .LVU19
+ 107:Core/Src/freertos.c **** 
+ 141              		.loc 1 107 24 is_stmt 0 view .LVU20
+ 142 0002 1148     		ldr	r0, .L12
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 7
+
+
+ 143 0004 FFF7FEFF 		bl	osMutexNew
+ 144              	.LVL9:
+ 107:Core/Src/freertos.c **** 
+ 145              		.loc 1 107 22 view .LVU21
+ 146 0008 104B     		ldr	r3, .L12+4
+ 147 000a 1860     		str	r0, [r3]
+ 123:Core/Src/freertos.c **** 
+ 148              		.loc 1 123 3 is_stmt 1 view .LVU22
+ 123:Core/Src/freertos.c **** 
+ 149              		.loc 1 123 21 is_stmt 0 view .LVU23
+ 150 000c 104A     		ldr	r2, .L12+8
+ 151 000e 0121     		movs	r1, #1
+ 152 0010 1020     		movs	r0, #16
+ 153 0012 FFF7FEFF 		bl	osMessageQueueNew
+ 154              	.LVL10:
+ 123:Core/Src/freertos.c **** 
+ 155              		.loc 1 123 19 view .LVU24
+ 156 0016 0F4B     		ldr	r3, .L12+12
+ 157 0018 1860     		str	r0, [r3]
+ 131:Core/Src/freertos.c **** 
+ 158              		.loc 1 131 3 is_stmt 1 view .LVU25
+ 131:Core/Src/freertos.c **** 
+ 159              		.loc 1 131 24 is_stmt 0 view .LVU26
+ 160 001a 0F4A     		ldr	r2, .L12+16
+ 161 001c 0021     		movs	r1, #0
+ 162 001e 0F48     		ldr	r0, .L12+20
+ 163 0020 FFF7FEFF 		bl	osThreadNew
+ 164              	.LVL11:
+ 131:Core/Src/freertos.c **** 
+ 165              		.loc 1 131 22 view .LVU27
+ 166 0024 0E4B     		ldr	r3, .L12+24
+ 167 0026 1860     		str	r0, [r3]
+ 134:Core/Src/freertos.c **** 
+ 168              		.loc 1 134 3 is_stmt 1 view .LVU28
+ 134:Core/Src/freertos.c **** 
+ 169              		.loc 1 134 24 is_stmt 0 view .LVU29
+ 170 0028 0E4A     		ldr	r2, .L12+28
+ 171 002a 0021     		movs	r1, #0
+ 172 002c 0E48     		ldr	r0, .L12+32
+ 173 002e FFF7FEFF 		bl	osThreadNew
+ 174              	.LVL12:
+ 134:Core/Src/freertos.c **** 
+ 175              		.loc 1 134 22 view .LVU30
+ 176 0032 0E4B     		ldr	r3, .L12+36
+ 177 0034 1860     		str	r0, [r3]
+ 137:Core/Src/freertos.c **** 
+ 178              		.loc 1 137 3 is_stmt 1 view .LVU31
+ 137:Core/Src/freertos.c **** 
+ 179              		.loc 1 137 20 is_stmt 0 view .LVU32
+ 180 0036 0E4A     		ldr	r2, .L12+40
+ 181 0038 0021     		movs	r1, #0
+ 182 003a 0E48     		ldr	r0, .L12+44
+ 183 003c FFF7FEFF 		bl	osThreadNew
+ 184              	.LVL13:
+ 137:Core/Src/freertos.c **** 
+ 185              		.loc 1 137 18 view .LVU33
+ 186 0040 0D4B     		ldr	r3, .L12+48
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 8
+
+
+ 187 0042 1860     		str	r0, [r3]
+ 147:Core/Src/freertos.c **** 
+ 188              		.loc 1 147 1 view .LVU34
+ 189 0044 08BD     		pop	{r3, pc}
+ 190              	.L13:
+ 191 0046 00BF     		.align	2
+ 192              	.L12:
+ 193 0048 00000000 		.word	.LANCHOR0
+ 194 004c 00000000 		.word	.LANCHOR1
+ 195 0050 00000000 		.word	.LANCHOR2
+ 196 0054 00000000 		.word	.LANCHOR3
+ 197 0058 00000000 		.word	.LANCHOR4
+ 198 005c 00000000 		.word	StartMeasureTask
+ 199 0060 00000000 		.word	.LANCHOR5
+ 200 0064 00000000 		.word	.LANCHOR6
+ 201 0068 00000000 		.word	StartDisplayTask
+ 202 006c 00000000 		.word	.LANCHOR7
+ 203 0070 00000000 		.word	.LANCHOR8
+ 204 0074 00000000 		.word	StartKeyTask
+ 205 0078 00000000 		.word	.LANCHOR9
+ 206              		.cfi_endproc
+ 207              	.LFE243:
+ 209              		.global	Mutex_Result_attributes
+ 210              		.section	.rodata.str1.4,"aMS",%progbits,1
+ 211              		.align	2
+ 212              	.LC0:
+ 213 0000 4D757465 		.ascii	"Mutex_Result\000"
+ 213      785F5265 
+ 213      73756C74 
+ 213      00
+ 214              		.global	Mutex_ResultHandle
+ 215              		.global	Queue_Cmd_attributes
+ 216 000d 000000   		.align	2
+ 217              	.LC1:
+ 218 0010 51756575 		.ascii	"Queue_Cmd\000"
+ 218      655F436D 
+ 218      6400
+ 219              		.global	Queue_CmdHandle
+ 220              		.global	Task_Key_attributes
+ 221 001a 0000     		.align	2
+ 222              	.LC2:
+ 223 001c 5461736B 		.ascii	"Task_Key\000"
+ 223      5F4B6579 
+ 223      00
+ 224              		.global	Task_KeyHandle
+ 225              		.global	Task_Display_attributes
+ 226 0025 000000   		.align	2
+ 227              	.LC3:
+ 228 0028 5461736B 		.ascii	"Task_Display\000"
+ 228      5F446973 
+ 228      706C6179 
+ 228      00
+ 229              		.global	Task_DisplayHandle
+ 230              		.global	Task_Measure_attributes
+ 231 0035 000000   		.align	2
+ 232              	.LC4:
+ 233 0038 5461736B 		.ascii	"Task_Measure\000"
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 9
+
+
+ 233      5F4D6561 
+ 233      73757265 
+ 233      00
+ 234              		.global	Task_MeasureHandle
+ 235              		.section	.bss.Mutex_ResultHandle,"aw",%nobits
+ 236              		.align	2
+ 237              		.set	.LANCHOR1,. + 0
+ 240              	Mutex_ResultHandle:
+ 241 0000 00000000 		.space	4
+ 242              		.section	.bss.Queue_CmdHandle,"aw",%nobits
+ 243              		.align	2
+ 244              		.set	.LANCHOR3,. + 0
+ 247              	Queue_CmdHandle:
+ 248 0000 00000000 		.space	4
+ 249              		.section	.bss.Task_DisplayHandle,"aw",%nobits
+ 250              		.align	2
+ 251              		.set	.LANCHOR7,. + 0
+ 254              	Task_DisplayHandle:
+ 255 0000 00000000 		.space	4
+ 256              		.section	.bss.Task_KeyHandle,"aw",%nobits
+ 257              		.align	2
+ 258              		.set	.LANCHOR9,. + 0
+ 261              	Task_KeyHandle:
+ 262 0000 00000000 		.space	4
+ 263              		.section	.bss.Task_MeasureHandle,"aw",%nobits
+ 264              		.align	2
+ 265              		.set	.LANCHOR5,. + 0
+ 268              	Task_MeasureHandle:
+ 269 0000 00000000 		.space	4
+ 270              		.section	.rodata.Mutex_Result_attributes,"a"
+ 271              		.align	2
+ 272              		.set	.LANCHOR0,. + 0
+ 275              	Mutex_Result_attributes:
+ 276 0000 00000000 		.word	.LC0
+ 277 0004 00000000 		.space	12
+ 277      00000000 
+ 277      00000000 
+ 278              		.section	.rodata.Queue_Cmd_attributes,"a"
+ 279              		.align	2
+ 280              		.set	.LANCHOR2,. + 0
+ 283              	Queue_Cmd_attributes:
+ 284 0000 10000000 		.word	.LC1
+ 285 0004 00000000 		.space	20
+ 285      00000000 
+ 285      00000000 
+ 285      00000000 
+ 285      00000000 
+ 286              		.section	.rodata.Task_Display_attributes,"a"
+ 287              		.align	2
+ 288              		.set	.LANCHOR6,. + 0
+ 291              	Task_Display_attributes:
+ 292 0000 28000000 		.word	.LC3
+ 293 0004 00000000 		.space	16
+ 293      00000000 
+ 293      00000000 
+ 293      00000000 
+ 294 0014 00080000 		.word	2048
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 10
+
+
+ 295 0018 18000000 		.word	24
+ 296 001c 00000000 		.space	8
+ 296      00000000 
+ 297              		.section	.rodata.Task_Key_attributes,"a"
+ 298              		.align	2
+ 299              		.set	.LANCHOR8,. + 0
+ 302              	Task_Key_attributes:
+ 303 0000 1C000000 		.word	.LC2
+ 304 0004 00000000 		.space	16
+ 304      00000000 
+ 304      00000000 
+ 304      00000000 
+ 305 0014 00040000 		.word	1024
+ 306 0018 08000000 		.word	8
+ 307 001c 00000000 		.space	8
+ 307      00000000 
+ 308              		.section	.rodata.Task_Measure_attributes,"a"
+ 309              		.align	2
+ 310              		.set	.LANCHOR4,. + 0
+ 313              	Task_Measure_attributes:
+ 314 0000 38000000 		.word	.LC4
+ 315 0004 00000000 		.space	16
+ 315      00000000 
+ 315      00000000 
+ 315      00000000 
+ 316 0014 00080000 		.word	2048
+ 317 0018 28000000 		.word	40
+ 318 001c 00000000 		.space	8
+ 318      00000000 
+ 319              		.text
+ 320              	.Letext0:
+ 321              		.file 2 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\machine\\_default_types.h"
+ 322              		.file 3 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\sys\\_stdint.h"
+ 323              		.file 4 "Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h"
+ 324              		.file 5 "User_App/app_key.h"
+ 325              		.file 6 "User_App/app_display.h"
+ 326              		.file 7 "User_App/app_measure.h"
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s 			page 11
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 freertos.c
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:20     .text.StartMeasureTask:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:26     .text.StartMeasureTask:00000000 StartMeasureTask
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:55     .text.StartDisplayTask:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:61     .text.StartDisplayTask:00000000 StartDisplayTask
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:89     .text.StartKeyTask:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:95     .text.StartKeyTask:00000000 StartKeyTask
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:123    .text.MX_FREERTOS_Init:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:129    .text.MX_FREERTOS_Init:00000000 MX_FREERTOS_Init
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:193    .text.MX_FREERTOS_Init:00000048 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:275    .rodata.Mutex_Result_attributes:00000000 Mutex_Result_attributes
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:211    .rodata.str1.4:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:240    .bss.Mutex_ResultHandle:00000000 Mutex_ResultHandle
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:283    .rodata.Queue_Cmd_attributes:00000000 Queue_Cmd_attributes
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:247    .bss.Queue_CmdHandle:00000000 Queue_CmdHandle
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:302    .rodata.Task_Key_attributes:00000000 Task_Key_attributes
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:261    .bss.Task_KeyHandle:00000000 Task_KeyHandle
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:291    .rodata.Task_Display_attributes:00000000 Task_Display_attributes
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:254    .bss.Task_DisplayHandle:00000000 Task_DisplayHandle
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:313    .rodata.Task_Measure_attributes:00000000 Task_Measure_attributes
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:268    .bss.Task_MeasureHandle:00000000 Task_MeasureHandle
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:236    .bss.Mutex_ResultHandle:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:243    .bss.Queue_CmdHandle:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:250    .bss.Task_DisplayHandle:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:257    .bss.Task_KeyHandle:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:264    .bss.Task_MeasureHandle:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:271    .rodata.Mutex_Result_attributes:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:279    .rodata.Queue_Cmd_attributes:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:287    .rodata.Task_Display_attributes:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:298    .rodata.Task_Key_attributes:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccnwEBTh.s:309    .rodata.Task_Measure_attributes:00000000 $d
+
+UNDEFINED SYMBOLS
+App_Measure_Init
+App_Measure_Run
+App_Display_Init
+App_Display_Run
+App_Key_Init
+App_Key_Run
+osMutexNew
+osMessageQueueNew
+osThreadNew

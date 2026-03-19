@@ -1,0 +1,567 @@
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s 			page 1
+
+
+   1              		.cpu cortex-m4
+   2              		.arch armv7e-m
+   3              		.fpu fpv4-sp-d16
+   4              		.eabi_attribute 27, 1
+   5              		.eabi_attribute 28, 1
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.file	"bsp_tim4.c"
+  16              		.text
+  17              	.Ltext0:
+  18              		.cfi_sections	.debug_frame
+  19              		.section	.text.BSP_TIM4_FindParam,"ax",%progbits
+  20              		.align	1
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	BSP_TIM4_FindParam:
+  26              	.LVL0:
+  27              	.LFB239:
+  28              		.file 1 "User_BSP/bsp_tim4.c"
+   1:User_BSP/bsp_tim4.c **** ﻿#include "bsp_tim4.h"
+   2:User_BSP/bsp_tim4.c **** #include "tim.h"
+   3:User_BSP/bsp_tim4.c **** #include "stm32f4xx_hal.h"
+   4:User_BSP/bsp_tim4.c **** 
+   5:User_BSP/bsp_tim4.c **** typedef struct {
+   6:User_BSP/bsp_tim4.c ****     uint32_t freq_hz;
+   7:User_BSP/bsp_tim4.c ****     uint16_t arr;
+   8:User_BSP/bsp_tim4.c ****     uint16_t ccr4;
+   9:User_BSP/bsp_tim4.c ****     uint16_t ccr3;
+  10:User_BSP/bsp_tim4.c **** } Tim4FreqParam_t;
+  11:User_BSP/bsp_tim4.c **** 
+  12:User_BSP/bsp_tim4.c **** static const Tim4FreqParam_t kFreqTable[] = {
+  13:User_BSP/bsp_tim4.c ****     {100u, 8399u, 4200u, 2100u},
+  14:User_BSP/bsp_tim4.c ****     {1000u, 839u, 420u, 210u},
+  15:User_BSP/bsp_tim4.c ****     {10000u, 83u, 42u, 21u},
+  16:User_BSP/bsp_tim4.c ****     {100000u, 7u, 4u, 2u},
+  17:User_BSP/bsp_tim4.c **** };
+  18:User_BSP/bsp_tim4.c **** 
+  19:User_BSP/bsp_tim4.c **** static uint32_t s_current_freq_hz = 1000u;
+  20:User_BSP/bsp_tim4.c **** static uint8_t s_sync_enable = 1u;
+  21:User_BSP/bsp_tim4.c **** static volatile uint32_t s_sync_count = 0u;
+  22:User_BSP/bsp_tim4.c **** 
+  23:User_BSP/bsp_tim4.c **** extern TIM_HandleTypeDef htim4;
+  24:User_BSP/bsp_tim4.c **** 
+  25:User_BSP/bsp_tim4.c **** static const Tim4FreqParam_t *BSP_TIM4_FindParam(uint32_t freq_hz)
+  26:User_BSP/bsp_tim4.c **** {
+  29              		.loc 1 26 1 view -0
+  30              		.cfi_startproc
+  31              		@ args = 0, pretend = 0, frame = 0
+  32              		@ frame_needed = 0, uses_anonymous_args = 0
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s 			page 2
+
+
+  33              		@ link register save eliminated.
+  27:User_BSP/bsp_tim4.c ****     uint32_t i;
+  34              		.loc 1 27 5 view .LVU1
+  28:User_BSP/bsp_tim4.c **** 
+  29:User_BSP/bsp_tim4.c ****     for (i = 0u; i < (sizeof(kFreqTable) / sizeof(kFreqTable[0])); i++) {
+  35              		.loc 1 29 5 view .LVU2
+  36              		.loc 1 29 12 is_stmt 0 view .LVU3
+  37 0000 0023     		movs	r3, #0
+  38              	.LVL1:
+  39              	.L2:
+  40              		.loc 1 29 18 is_stmt 1 discriminator 1 view .LVU4
+  41              		.loc 1 29 5 is_stmt 0 discriminator 1 view .LVU5
+  42 0002 032B     		cmp	r3, #3
+  43 0004 0DD8     		bhi	.L6
+  30:User_BSP/bsp_tim4.c ****         if (kFreqTable[i].freq_hz == freq_hz) {
+  44              		.loc 1 30 9 is_stmt 1 view .LVU6
+  45              		.loc 1 30 26 is_stmt 0 view .LVU7
+  46 0006 03EB4302 		add	r2, r3, r3, lsl #1
+  47 000a 0749     		ldr	r1, .L8
+  48 000c 51F82220 		ldr	r2, [r1, r2, lsl #2]
+  49              		.loc 1 30 12 view .LVU8
+  50 0010 8242     		cmp	r2, r0
+  51 0012 01D0     		beq	.L7
+  29:User_BSP/bsp_tim4.c ****         if (kFreqTable[i].freq_hz == freq_hz) {
+  52              		.loc 1 29 68 is_stmt 1 discriminator 2 view .LVU9
+  29:User_BSP/bsp_tim4.c ****         if (kFreqTable[i].freq_hz == freq_hz) {
+  53              		.loc 1 29 69 is_stmt 0 discriminator 2 view .LVU10
+  54 0014 0133     		adds	r3, r3, #1
+  55              	.LVL2:
+  29:User_BSP/bsp_tim4.c ****         if (kFreqTable[i].freq_hz == freq_hz) {
+  56              		.loc 1 29 69 discriminator 2 view .LVU11
+  57 0016 F4E7     		b	.L2
+  58              	.L7:
+  31:User_BSP/bsp_tim4.c ****             return &kFreqTable[i];
+  59              		.loc 1 31 13 is_stmt 1 view .LVU12
+  60              		.loc 1 31 20 is_stmt 0 view .LVU13
+  61 0018 03EB4303 		add	r3, r3, r3, lsl #1
+  62              	.LVL3:
+  63              		.loc 1 31 20 view .LVU14
+  64 001c 01EB8300 		add	r0, r1, r3, lsl #2
+  65              	.LVL4:
+  66              		.loc 1 31 20 view .LVU15
+  67 0020 7047     		bx	lr
+  68              	.LVL5:
+  69              	.L6:
+  32:User_BSP/bsp_tim4.c ****         }
+  33:User_BSP/bsp_tim4.c ****     }
+  34:User_BSP/bsp_tim4.c **** 
+  35:User_BSP/bsp_tim4.c ****     return &kFreqTable[1];
+  70              		.loc 1 35 12 view .LVU16
+  71 0022 0248     		ldr	r0, .L8+4
+  72              	.LVL6:
+  36:User_BSP/bsp_tim4.c **** }
+  73              		.loc 1 36 1 view .LVU17
+  74 0024 7047     		bx	lr
+  75              	.L9:
+  76 0026 00BF     		.align	2
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s 			page 3
+
+
+  77              	.L8:
+  78 0028 00000000 		.word	.LANCHOR0
+  79 002c 0C000000 		.word	.LANCHOR0+12
+  80              		.cfi_endproc
+  81              	.LFE239:
+  83              		.section	.text.BSP_TIM4_ApplyParam,"ax",%progbits
+  84              		.align	1
+  85              		.syntax unified
+  86              		.thumb
+  87              		.thumb_func
+  89              	BSP_TIM4_ApplyParam:
+  90              	.LVL7:
+  91              	.LFB240:
+  37:User_BSP/bsp_tim4.c **** 
+  38:User_BSP/bsp_tim4.c **** static void BSP_TIM4_ApplyParam(const Tim4FreqParam_t *param)
+  39:User_BSP/bsp_tim4.c **** {
+  92              		.loc 1 39 1 is_stmt 1 view -0
+  93              		.cfi_startproc
+  94              		@ args = 0, pretend = 0, frame = 0
+  95              		@ frame_needed = 0, uses_anonymous_args = 0
+  96              		@ link register save eliminated.
+  40:User_BSP/bsp_tim4.c ****     __HAL_TIM_SET_AUTORELOAD(&htim4, param->arr);
+  97              		.loc 1 40 5 view .LVU19
+  98              		.loc 1 40 5 view .LVU20
+  99 0000 064A     		ldr	r2, .L11
+ 100 0002 1368     		ldr	r3, [r2]
+ 101 0004 8188     		ldrh	r1, [r0, #4]
+ 102 0006 D962     		str	r1, [r3, #44]
+ 103              		.loc 1 40 5 view .LVU21
+ 104 0008 8188     		ldrh	r1, [r0, #4]
+ 105 000a D160     		str	r1, [r2, #12]
+ 106              		.loc 1 40 5 view .LVU22
+  41:User_BSP/bsp_tim4.c ****     __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, param->ccr4);
+ 107              		.loc 1 41 5 view .LVU23
+ 108 000c C288     		ldrh	r2, [r0, #6]
+ 109 000e 1A64     		str	r2, [r3, #64]
+  42:User_BSP/bsp_tim4.c ****     __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, param->ccr3);
+ 110              		.loc 1 42 5 view .LVU24
+ 111 0010 0289     		ldrh	r2, [r0, #8]
+ 112 0012 DA63     		str	r2, [r3, #60]
+  43:User_BSP/bsp_tim4.c ****     __HAL_TIM_SET_COUNTER(&htim4, 0u);
+ 113              		.loc 1 43 5 view .LVU25
+ 114 0014 0022     		movs	r2, #0
+ 115 0016 5A62     		str	r2, [r3, #36]
+  44:User_BSP/bsp_tim4.c **** }
+ 116              		.loc 1 44 1 is_stmt 0 view .LVU26
+ 117 0018 7047     		bx	lr
+ 118              	.L12:
+ 119 001a 00BF     		.align	2
+ 120              	.L11:
+ 121 001c 00000000 		.word	htim4
+ 122              		.cfi_endproc
+ 123              	.LFE240:
+ 125              		.section	.text.BSP_TIM4_Init,"ax",%progbits
+ 126              		.align	1
+ 127              		.global	BSP_TIM4_Init
+ 128              		.syntax unified
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s 			page 4
+
+
+ 129              		.thumb
+ 130              		.thumb_func
+ 132              	BSP_TIM4_Init:
+ 133              	.LFB241:
+  45:User_BSP/bsp_tim4.c **** 
+  46:User_BSP/bsp_tim4.c **** void BSP_TIM4_Init(void)
+  47:User_BSP/bsp_tim4.c **** {
+ 134              		.loc 1 47 1 is_stmt 1 view -0
+ 135              		.cfi_startproc
+ 136              		@ args = 0, pretend = 0, frame = 0
+ 137              		@ frame_needed = 0, uses_anonymous_args = 0
+ 138 0000 38B5     		push	{r3, r4, r5, lr}
+ 139              	.LCFI0:
+ 140              		.cfi_def_cfa_offset 16
+ 141              		.cfi_offset 3, -16
+ 142              		.cfi_offset 4, -12
+ 143              		.cfi_offset 5, -8
+ 144              		.cfi_offset 14, -4
+  48:User_BSP/bsp_tim4.c ****     const Tim4FreqParam_t *param = BSP_TIM4_FindParam(1000u);
+ 145              		.loc 1 48 5 view .LVU28
+ 146              		.loc 1 48 36 is_stmt 0 view .LVU29
+ 147 0002 4FF47A70 		mov	r0, #1000
+ 148 0006 FFF7FEFF 		bl	BSP_TIM4_FindParam
+ 149              	.LVL8:
+ 150 000a 0546     		mov	r5, r0
+ 151              	.LVL9:
+  49:User_BSP/bsp_tim4.c **** 
+  50:User_BSP/bsp_tim4.c ****     HAL_TIM_OC_Stop(&htim4, TIM_CHANNEL_3);
+ 152              		.loc 1 50 5 is_stmt 1 view .LVU30
+ 153 000c 0D4C     		ldr	r4, .L15
+ 154 000e 0821     		movs	r1, #8
+ 155 0010 2046     		mov	r0, r4
+ 156              	.LVL10:
+ 157              		.loc 1 50 5 is_stmt 0 view .LVU31
+ 158 0012 FFF7FEFF 		bl	HAL_TIM_OC_Stop
+ 159              	.LVL11:
+  51:User_BSP/bsp_tim4.c ****     HAL_TIM_OC_Stop(&htim4, TIM_CHANNEL_4);
+ 160              		.loc 1 51 5 is_stmt 1 view .LVU32
+ 161 0016 0C21     		movs	r1, #12
+ 162 0018 2046     		mov	r0, r4
+ 163 001a FFF7FEFF 		bl	HAL_TIM_OC_Stop
+ 164              	.LVL12:
+  52:User_BSP/bsp_tim4.c **** 
+  53:User_BSP/bsp_tim4.c ****     BSP_TIM4_ApplyParam(param);
+ 165              		.loc 1 53 5 view .LVU33
+ 166 001e 2846     		mov	r0, r5
+ 167 0020 FFF7FEFF 		bl	BSP_TIM4_ApplyParam
+ 168              	.LVL13:
+  54:User_BSP/bsp_tim4.c **** 
+  55:User_BSP/bsp_tim4.c ****     s_current_freq_hz = param->freq_hz;
+ 169              		.loc 1 55 5 view .LVU34
+ 170              		.loc 1 55 30 is_stmt 0 view .LVU35
+ 171 0024 2A68     		ldr	r2, [r5]
+ 172              		.loc 1 55 23 view .LVU36
+ 173 0026 084B     		ldr	r3, .L15+4
+ 174 0028 1A60     		str	r2, [r3]
+  56:User_BSP/bsp_tim4.c ****     s_sync_enable = 1u;
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s 			page 5
+
+
+ 175              		.loc 1 56 5 is_stmt 1 view .LVU37
+ 176              		.loc 1 56 19 is_stmt 0 view .LVU38
+ 177 002a 084B     		ldr	r3, .L15+8
+ 178 002c 0122     		movs	r2, #1
+ 179 002e 1A70     		strb	r2, [r3]
+  57:User_BSP/bsp_tim4.c **** 
+  58:User_BSP/bsp_tim4.c ****     HAL_TIM_OC_Start(&htim4, TIM_CHANNEL_3);
+ 180              		.loc 1 58 5 is_stmt 1 view .LVU39
+ 181 0030 0821     		movs	r1, #8
+ 182 0032 2046     		mov	r0, r4
+ 183 0034 FFF7FEFF 		bl	HAL_TIM_OC_Start
+ 184              	.LVL14:
+  59:User_BSP/bsp_tim4.c ****     HAL_TIM_OC_Start(&htim4, TIM_CHANNEL_4);
+ 185              		.loc 1 59 5 view .LVU40
+ 186 0038 0C21     		movs	r1, #12
+ 187 003a 2046     		mov	r0, r4
+ 188 003c FFF7FEFF 		bl	HAL_TIM_OC_Start
+ 189              	.LVL15:
+  60:User_BSP/bsp_tim4.c **** }
+ 190              		.loc 1 60 1 is_stmt 0 view .LVU41
+ 191 0040 38BD     		pop	{r3, r4, r5, pc}
+ 192              	.LVL16:
+ 193              	.L16:
+ 194              		.loc 1 60 1 view .LVU42
+ 195 0042 00BF     		.align	2
+ 196              	.L15:
+ 197 0044 00000000 		.word	htim4
+ 198 0048 00000000 		.word	.LANCHOR1
+ 199 004c 00000000 		.word	.LANCHOR2
+ 200              		.cfi_endproc
+ 201              	.LFE241:
+ 203              		.section	.text.BSP_TIM4_SetFreq,"ax",%progbits
+ 204              		.align	1
+ 205              		.global	BSP_TIM4_SetFreq
+ 206              		.syntax unified
+ 207              		.thumb
+ 208              		.thumb_func
+ 210              	BSP_TIM4_SetFreq:
+ 211              	.LVL17:
+ 212              	.LFB242:
+  61:User_BSP/bsp_tim4.c **** 
+  62:User_BSP/bsp_tim4.c **** void BSP_TIM4_SetFreq(uint32_t freq_hz)
+  63:User_BSP/bsp_tim4.c **** {
+ 213              		.loc 1 63 1 is_stmt 1 view -0
+ 214              		.cfi_startproc
+ 215              		@ args = 0, pretend = 0, frame = 0
+ 216              		@ frame_needed = 0, uses_anonymous_args = 0
+ 217              		.loc 1 63 1 is_stmt 0 view .LVU44
+ 218 0000 38B5     		push	{r3, r4, r5, lr}
+ 219              	.LCFI1:
+ 220              		.cfi_def_cfa_offset 16
+ 221              		.cfi_offset 3, -16
+ 222              		.cfi_offset 4, -12
+ 223              		.cfi_offset 5, -8
+ 224              		.cfi_offset 14, -4
+  64:User_BSP/bsp_tim4.c ****     const Tim4FreqParam_t *param = BSP_TIM4_FindParam(freq_hz);
+ 225              		.loc 1 64 5 is_stmt 1 view .LVU45
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s 			page 6
+
+
+ 226              		.loc 1 64 36 is_stmt 0 view .LVU46
+ 227 0002 FFF7FEFF 		bl	BSP_TIM4_FindParam
+ 228              	.LVL18:
+  65:User_BSP/bsp_tim4.c **** 
+  66:User_BSP/bsp_tim4.c ****     if (s_current_freq_hz == param->freq_hz) {
+ 229              		.loc 1 66 5 is_stmt 1 view .LVU47
+ 230              		.loc 1 66 35 is_stmt 0 view .LVU48
+ 231 0006 0268     		ldr	r2, [r0]
+ 232              		.loc 1 66 27 view .LVU49
+ 233 0008 134B     		ldr	r3, .L22
+ 234 000a 1B68     		ldr	r3, [r3]
+ 235              		.loc 1 66 8 view .LVU50
+ 236 000c 9A42     		cmp	r2, r3
+ 237 000e 1FD0     		beq	.L17
+ 238 0010 0446     		mov	r4, r0
+  67:User_BSP/bsp_tim4.c ****         return;
+  68:User_BSP/bsp_tim4.c ****     }
+  69:User_BSP/bsp_tim4.c **** 
+  70:User_BSP/bsp_tim4.c ****     HAL_TIM_OC_Stop(&htim4, TIM_CHANNEL_3);
+ 239              		.loc 1 70 5 is_stmt 1 view .LVU51
+ 240 0012 124D     		ldr	r5, .L22+4
+ 241 0014 0821     		movs	r1, #8
+ 242 0016 2846     		mov	r0, r5
+ 243              	.LVL19:
+ 244              		.loc 1 70 5 is_stmt 0 view .LVU52
+ 245 0018 FFF7FEFF 		bl	HAL_TIM_OC_Stop
+ 246              	.LVL20:
+  71:User_BSP/bsp_tim4.c ****     HAL_TIM_OC_Stop(&htim4, TIM_CHANNEL_4);
+ 247              		.loc 1 71 5 is_stmt 1 view .LVU53
+ 248 001c 0C21     		movs	r1, #12
+ 249 001e 2846     		mov	r0, r5
+ 250 0020 FFF7FEFF 		bl	HAL_TIM_OC_Stop
+ 251              	.LVL21:
+  72:User_BSP/bsp_tim4.c **** 
+  73:User_BSP/bsp_tim4.c ****     BSP_TIM4_ApplyParam(param);
+ 252              		.loc 1 73 5 view .LVU54
+ 253 0024 2046     		mov	r0, r4
+ 254 0026 FFF7FEFF 		bl	BSP_TIM4_ApplyParam
+ 255              	.LVL22:
+  74:User_BSP/bsp_tim4.c **** 
+  75:User_BSP/bsp_tim4.c ****     s_current_freq_hz = param->freq_hz;
+ 256              		.loc 1 75 5 view .LVU55
+ 257              		.loc 1 75 30 is_stmt 0 view .LVU56
+ 258 002a 2368     		ldr	r3, [r4]
+ 259              		.loc 1 75 23 view .LVU57
+ 260 002c 0A4A     		ldr	r2, .L22
+ 261 002e 1360     		str	r3, [r2]
+  76:User_BSP/bsp_tim4.c ****     s_sync_enable = (param->freq_hz <= 10000u) ? 1u : 0u;
+ 262              		.loc 1 76 5 is_stmt 1 view .LVU58
+ 263              		.loc 1 76 19 is_stmt 0 view .LVU59
+ 264 0030 42F21072 		movw	r2, #10000
+ 265 0034 9342     		cmp	r3, r2
+ 266 0036 0CD8     		bhi	.L20
+ 267 0038 0123     		movs	r3, #1
+ 268              	.L19:
+ 269              		.loc 1 76 19 discriminator 4 view .LVU60
+ 270 003a 094A     		ldr	r2, .L22+8
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s 			page 7
+
+
+ 271 003c 1370     		strb	r3, [r2]
+  77:User_BSP/bsp_tim4.c **** 
+  78:User_BSP/bsp_tim4.c ****     HAL_TIM_OC_Start(&htim4, TIM_CHANNEL_3);
+ 272              		.loc 1 78 5 is_stmt 1 discriminator 4 view .LVU61
+ 273 003e 074C     		ldr	r4, .L22+4
+ 274              	.LVL23:
+ 275              		.loc 1 78 5 is_stmt 0 discriminator 4 view .LVU62
+ 276 0040 0821     		movs	r1, #8
+ 277 0042 2046     		mov	r0, r4
+ 278 0044 FFF7FEFF 		bl	HAL_TIM_OC_Start
+ 279              	.LVL24:
+  79:User_BSP/bsp_tim4.c ****     HAL_TIM_OC_Start(&htim4, TIM_CHANNEL_4);
+ 280              		.loc 1 79 5 is_stmt 1 discriminator 4 view .LVU63
+ 281 0048 0C21     		movs	r1, #12
+ 282 004a 2046     		mov	r0, r4
+ 283 004c FFF7FEFF 		bl	HAL_TIM_OC_Start
+ 284              	.LVL25:
+ 285              	.L17:
+  80:User_BSP/bsp_tim4.c **** }
+ 286              		.loc 1 80 1 is_stmt 0 view .LVU64
+ 287 0050 38BD     		pop	{r3, r4, r5, pc}
+ 288              	.LVL26:
+ 289              	.L20:
+  76:User_BSP/bsp_tim4.c **** 
+ 290              		.loc 1 76 19 view .LVU65
+ 291 0052 0023     		movs	r3, #0
+ 292 0054 F1E7     		b	.L19
+ 293              	.L23:
+ 294 0056 00BF     		.align	2
+ 295              	.L22:
+ 296 0058 00000000 		.word	.LANCHOR1
+ 297 005c 00000000 		.word	htim4
+ 298 0060 00000000 		.word	.LANCHOR2
+ 299              		.cfi_endproc
+ 300              	.LFE242:
+ 302              		.section	.text.BSP_TIM4_PhaseSync,"ax",%progbits
+ 303              		.align	1
+ 304              		.global	BSP_TIM4_PhaseSync
+ 305              		.syntax unified
+ 306              		.thumb
+ 307              		.thumb_func
+ 309              	BSP_TIM4_PhaseSync:
+ 310              	.LFB243:
+  81:User_BSP/bsp_tim4.c **** 
+  82:User_BSP/bsp_tim4.c **** void BSP_TIM4_PhaseSync(void)
+  83:User_BSP/bsp_tim4.c **** {
+ 311              		.loc 1 83 1 is_stmt 1 view -0
+ 312              		.cfi_startproc
+ 313              		@ args = 0, pretend = 0, frame = 0
+ 314              		@ frame_needed = 0, uses_anonymous_args = 0
+ 315              		@ link register save eliminated.
+  84:User_BSP/bsp_tim4.c ****     if (s_sync_enable == 0u) {
+ 316              		.loc 1 84 5 view .LVU67
+ 317              		.loc 1 84 23 is_stmt 0 view .LVU68
+ 318 0000 054B     		ldr	r3, .L26
+ 319 0002 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 320              		.loc 1 84 8 view .LVU69
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s 			page 8
+
+
+ 321 0004 33B1     		cbz	r3, .L24
+  85:User_BSP/bsp_tim4.c ****         return;
+  86:User_BSP/bsp_tim4.c ****     }
+  87:User_BSP/bsp_tim4.c **** 
+  88:User_BSP/bsp_tim4.c ****     TIM4->CNT = 0u;
+ 322              		.loc 1 88 5 is_stmt 1 view .LVU70
+ 323              		.loc 1 88 15 is_stmt 0 view .LVU71
+ 324 0006 054B     		ldr	r3, .L26+4
+ 325 0008 0022     		movs	r2, #0
+ 326 000a 5A62     		str	r2, [r3, #36]
+  89:User_BSP/bsp_tim4.c ****     s_sync_count++;
+ 327              		.loc 1 89 5 is_stmt 1 view .LVU72
+ 328              		.loc 1 89 17 is_stmt 0 view .LVU73
+ 329 000c 044A     		ldr	r2, .L26+8
+ 330 000e 1368     		ldr	r3, [r2]
+ 331 0010 0133     		adds	r3, r3, #1
+ 332 0012 1360     		str	r3, [r2]
+ 333              	.L24:
+  90:User_BSP/bsp_tim4.c **** }
+ 334              		.loc 1 90 1 view .LVU74
+ 335 0014 7047     		bx	lr
+ 336              	.L27:
+ 337 0016 00BF     		.align	2
+ 338              	.L26:
+ 339 0018 00000000 		.word	.LANCHOR2
+ 340 001c 00080040 		.word	1073743872
+ 341 0020 00000000 		.word	.LANCHOR3
+ 342              		.cfi_endproc
+ 343              	.LFE243:
+ 345              		.section	.text.BSP_TIM4_GetSyncCount,"ax",%progbits
+ 346              		.align	1
+ 347              		.global	BSP_TIM4_GetSyncCount
+ 348              		.syntax unified
+ 349              		.thumb
+ 350              		.thumb_func
+ 352              	BSP_TIM4_GetSyncCount:
+ 353              	.LFB244:
+  91:User_BSP/bsp_tim4.c **** 
+  92:User_BSP/bsp_tim4.c **** uint32_t BSP_TIM4_GetSyncCount(void)
+  93:User_BSP/bsp_tim4.c **** {
+ 354              		.loc 1 93 1 is_stmt 1 view -0
+ 355              		.cfi_startproc
+ 356              		@ args = 0, pretend = 0, frame = 0
+ 357              		@ frame_needed = 0, uses_anonymous_args = 0
+ 358              		@ link register save eliminated.
+  94:User_BSP/bsp_tim4.c ****     return s_sync_count;
+ 359              		.loc 1 94 5 view .LVU76
+ 360              		.loc 1 94 12 is_stmt 0 view .LVU77
+ 361 0000 014B     		ldr	r3, .L29
+ 362 0002 1868     		ldr	r0, [r3]
+  95:User_BSP/bsp_tim4.c **** }
+ 363              		.loc 1 95 1 view .LVU78
+ 364 0004 7047     		bx	lr
+ 365              	.L30:
+ 366 0006 00BF     		.align	2
+ 367              	.L29:
+ 368 0008 00000000 		.word	.LANCHOR3
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s 			page 9
+
+
+ 369              		.cfi_endproc
+ 370              	.LFE244:
+ 372              		.section	.bss.s_sync_count,"aw",%nobits
+ 373              		.align	2
+ 374              		.set	.LANCHOR3,. + 0
+ 377              	s_sync_count:
+ 378 0000 00000000 		.space	4
+ 379              		.section	.data.s_current_freq_hz,"aw"
+ 380              		.align	2
+ 381              		.set	.LANCHOR1,. + 0
+ 384              	s_current_freq_hz:
+ 385 0000 E8030000 		.word	1000
+ 386              		.section	.data.s_sync_enable,"aw"
+ 387              		.set	.LANCHOR2,. + 0
+ 390              	s_sync_enable:
+ 391 0000 01       		.byte	1
+ 392              		.section	.rodata.kFreqTable,"a"
+ 393              		.align	2
+ 394              		.set	.LANCHOR0,. + 0
+ 397              	kFreqTable:
+ 398 0000 64000000 		.word	100
+ 399 0004 CF20     		.short	8399
+ 400 0006 6810     		.short	4200
+ 401 0008 3408     		.short	2100
+ 402 000a 0000     		.space	2
+ 403 000c E8030000 		.word	1000
+ 404 0010 4703     		.short	839
+ 405 0012 A401     		.short	420
+ 406 0014 D200     		.short	210
+ 407 0016 0000     		.space	2
+ 408 0018 10270000 		.word	10000
+ 409 001c 5300     		.short	83
+ 410 001e 2A00     		.short	42
+ 411 0020 1500     		.short	21
+ 412 0022 0000     		.space	2
+ 413 0024 A0860100 		.word	100000
+ 414 0028 0700     		.short	7
+ 415 002a 0400     		.short	4
+ 416 002c 0200     		.short	2
+ 417 002e 0000     		.space	2
+ 418              		.text
+ 419              	.Letext0:
+ 420              		.file 2 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\machine\\_default_types.h"
+ 421              		.file 3 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\sys\\_stdint.h"
+ 422              		.file 4 "Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f405xx.h"
+ 423              		.file 5 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_def.h"
+ 424              		.file 6 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_dma.h"
+ 425              		.file 7 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h"
+ 426              		.file 8 "Core/Inc/tim.h"
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s 			page 10
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 bsp_tim4.c
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:20     .text.BSP_TIM4_FindParam:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:25     .text.BSP_TIM4_FindParam:00000000 BSP_TIM4_FindParam
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:78     .text.BSP_TIM4_FindParam:00000028 $d
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:84     .text.BSP_TIM4_ApplyParam:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:89     .text.BSP_TIM4_ApplyParam:00000000 BSP_TIM4_ApplyParam
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:121    .text.BSP_TIM4_ApplyParam:0000001c $d
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:126    .text.BSP_TIM4_Init:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:132    .text.BSP_TIM4_Init:00000000 BSP_TIM4_Init
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:197    .text.BSP_TIM4_Init:00000044 $d
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:204    .text.BSP_TIM4_SetFreq:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:210    .text.BSP_TIM4_SetFreq:00000000 BSP_TIM4_SetFreq
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:296    .text.BSP_TIM4_SetFreq:00000058 $d
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:303    .text.BSP_TIM4_PhaseSync:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:309    .text.BSP_TIM4_PhaseSync:00000000 BSP_TIM4_PhaseSync
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:339    .text.BSP_TIM4_PhaseSync:00000018 $d
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:346    .text.BSP_TIM4_GetSyncCount:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:352    .text.BSP_TIM4_GetSyncCount:00000000 BSP_TIM4_GetSyncCount
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:368    .text.BSP_TIM4_GetSyncCount:00000008 $d
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:373    .bss.s_sync_count:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:377    .bss.s_sync_count:00000000 s_sync_count
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:380    .data.s_current_freq_hz:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:384    .data.s_current_freq_hz:00000000 s_current_freq_hz
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:390    .data.s_sync_enable:00000000 s_sync_enable
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:393    .rodata.kFreqTable:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccfWcew7.s:397    .rodata.kFreqTable:00000000 kFreqTable
+
+UNDEFINED SYMBOLS
+htim4
+HAL_TIM_OC_Stop
+HAL_TIM_OC_Start

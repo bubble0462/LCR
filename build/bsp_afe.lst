@@ -1,0 +1,741 @@
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 1
+
+
+   1              		.cpu cortex-m4
+   2              		.arch armv7e-m
+   3              		.fpu fpv4-sp-d16
+   4              		.eabi_attribute 27, 1
+   5              		.eabi_attribute 28, 1
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.file	"bsp_afe.c"
+  16              		.text
+  17              	.Ltext0:
+  18              		.cfi_sections	.debug_frame
+  19              		.section	.text.BSP_AFE_SetRref,"ax",%progbits
+  20              		.align	1
+  21              		.global	BSP_AFE_SetRref
+  22              		.syntax unified
+  23              		.thumb
+  24              		.thumb_func
+  26              	BSP_AFE_SetRref:
+  27              	.LVL0:
+  28              	.LFB240:
+  29              		.file 1 "User_BSP/bsp_afe.c"
+   1:User_BSP/bsp_afe.c **** ﻿#include "bsp_afe.h"
+   2:User_BSP/bsp_afe.c **** 
+   3:User_BSP/bsp_afe.c **** #define SET_S0S1(val, s0_port, s0_pin, s1_port, s1_pin) \
+   4:User_BSP/bsp_afe.c ****     do { \
+   5:User_BSP/bsp_afe.c ****         HAL_GPIO_WritePin((s0_port), (s0_pin), ((val) & 0x01u) ? GPIO_PIN_SET : GPIO_PIN_RESET); \
+   6:User_BSP/bsp_afe.c ****         HAL_GPIO_WritePin((s1_port), (s1_pin), ((val) & 0x02u) ? GPIO_PIN_SET : GPIO_PIN_RESET); \
+   7:User_BSP/bsp_afe.c ****     } while (0)
+   8:User_BSP/bsp_afe.c **** 
+   9:User_BSP/bsp_afe.c **** static AFE_Rref_t s_rref = RREF_1K;
+  10:User_BSP/bsp_afe.c **** static AFE_PGA_Gain_t s_gain = PGA_GAIN_0;
+  11:User_BSP/bsp_afe.c **** static AFE_LPF_Freq_t s_lpf = LPF_1KHZ;
+  12:User_BSP/bsp_afe.c **** static AFE_DDS_Amp_t s_amp = DDS_AMP_0V3;
+  13:User_BSP/bsp_afe.c **** 
+  14:User_BSP/bsp_afe.c **** void BSP_AFE_Init(void)
+  15:User_BSP/bsp_afe.c **** {
+  16:User_BSP/bsp_afe.c ****     BSP_AFE_SetRref(RREF_1K);
+  17:User_BSP/bsp_afe.c ****     BSP_AFE_SetPGAGain(PGA_GAIN_0);
+  18:User_BSP/bsp_afe.c ****     BSP_AFE_SetLPF(LPF_1KHZ);
+  19:User_BSP/bsp_afe.c ****     BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UX, PHASE_0DEG);
+  20:User_BSP/bsp_afe.c ****     BSP_AFE_SetDDSAmp(DDS_AMP_0V3);
+  21:User_BSP/bsp_afe.c **** }
+  22:User_BSP/bsp_afe.c **** 
+  23:User_BSP/bsp_afe.c **** void BSP_AFE_SetRref(AFE_Rref_t rref)
+  24:User_BSP/bsp_afe.c **** {
+  30              		.loc 1 24 1 view -0
+  31              		.cfi_startproc
+  32              		@ args = 0, pretend = 0, frame = 0
+  33              		@ frame_needed = 0, uses_anonymous_args = 0
+  34              		.loc 1 24 1 is_stmt 0 view .LVU1
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 2
+
+
+  35 0000 38B5     		push	{r3, r4, r5, lr}
+  36              	.LCFI0:
+  37              		.cfi_def_cfa_offset 16
+  38              		.cfi_offset 3, -16
+  39              		.cfi_offset 4, -12
+  40              		.cfi_offset 5, -8
+  41              		.cfi_offset 14, -4
+  42 0002 0446     		mov	r4, r0
+  25:User_BSP/bsp_afe.c ****     SET_S0S1((uint8_t)rref, VR_S0_GPIO_Port, VR_S0_Pin, VR_S1_GPIO_Port, VR_S1_Pin);
+  43              		.loc 1 25 5 is_stmt 1 view .LVU2
+  44              		.loc 1 25 5 view .LVU3
+  45 0004 084D     		ldr	r5, .L3
+  46 0006 00F00102 		and	r2, r0, #1
+  47 000a 4FF48051 		mov	r1, #4096
+  48 000e 2846     		mov	r0, r5
+  49              	.LVL1:
+  50              		.loc 1 25 5 is_stmt 0 view .LVU4
+  51 0010 FFF7FEFF 		bl	HAL_GPIO_WritePin
+  52              	.LVL2:
+  53              		.loc 1 25 5 is_stmt 1 view .LVU5
+  54 0014 C4F34002 		ubfx	r2, r4, #1, #1
+  55 0018 4FF40061 		mov	r1, #2048
+  56 001c 2846     		mov	r0, r5
+  57 001e FFF7FEFF 		bl	HAL_GPIO_WritePin
+  58              	.LVL3:
+  59              		.loc 1 25 5 view .LVU6
+  26:User_BSP/bsp_afe.c ****     s_rref = rref;
+  60              		.loc 1 26 5 view .LVU7
+  61              		.loc 1 26 12 is_stmt 0 view .LVU8
+  62 0022 024B     		ldr	r3, .L3+4
+  63 0024 1C70     		strb	r4, [r3]
+  27:User_BSP/bsp_afe.c **** }
+  64              		.loc 1 27 1 view .LVU9
+  65 0026 38BD     		pop	{r3, r4, r5, pc}
+  66              	.L4:
+  67              		.align	2
+  68              	.L3:
+  69 0028 00000240 		.word	1073872896
+  70 002c 00000000 		.word	.LANCHOR0
+  71              		.cfi_endproc
+  72              	.LFE240:
+  74              		.section	.text.BSP_AFE_GetRref,"ax",%progbits
+  75              		.align	1
+  76              		.global	BSP_AFE_GetRref
+  77              		.syntax unified
+  78              		.thumb
+  79              		.thumb_func
+  81              	BSP_AFE_GetRref:
+  82              	.LFB241:
+  28:User_BSP/bsp_afe.c **** 
+  29:User_BSP/bsp_afe.c **** AFE_Rref_t BSP_AFE_GetRref(void)
+  30:User_BSP/bsp_afe.c **** {
+  83              		.loc 1 30 1 is_stmt 1 view -0
+  84              		.cfi_startproc
+  85              		@ args = 0, pretend = 0, frame = 0
+  86              		@ frame_needed = 0, uses_anonymous_args = 0
+  87              		@ link register save eliminated.
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 3
+
+
+  31:User_BSP/bsp_afe.c ****     return s_rref;
+  88              		.loc 1 31 5 view .LVU11
+  32:User_BSP/bsp_afe.c **** }
+  89              		.loc 1 32 1 is_stmt 0 view .LVU12
+  90 0000 014B     		ldr	r3, .L6
+  91 0002 1878     		ldrb	r0, [r3]	@ zero_extendqisi2
+  92 0004 7047     		bx	lr
+  93              	.L7:
+  94 0006 00BF     		.align	2
+  95              	.L6:
+  96 0008 00000000 		.word	.LANCHOR0
+  97              		.cfi_endproc
+  98              	.LFE241:
+ 100              		.section	.text.BSP_AFE_GetRrefValue,"ax",%progbits
+ 101              		.align	1
+ 102              		.global	BSP_AFE_GetRrefValue
+ 103              		.syntax unified
+ 104              		.thumb
+ 105              		.thumb_func
+ 107              	BSP_AFE_GetRrefValue:
+ 108              	.LFB242:
+  33:User_BSP/bsp_afe.c **** 
+  34:User_BSP/bsp_afe.c **** float BSP_AFE_GetRrefValue(void)
+  35:User_BSP/bsp_afe.c **** {
+ 109              		.loc 1 35 1 is_stmt 1 view -0
+ 110              		.cfi_startproc
+ 111              		@ args = 0, pretend = 0, frame = 0
+ 112              		@ frame_needed = 0, uses_anonymous_args = 0
+ 113              		@ link register save eliminated.
+  36:User_BSP/bsp_afe.c ****     switch (s_rref) {
+ 114              		.loc 1 36 5 view .LVU14
+ 115 0000 094B     		ldr	r3, .L15
+ 116 0002 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 117 0004 032B     		cmp	r3, #3
+ 118 0006 0CD8     		bhi	.L14
+ 119 0008 DFE803F0 		tbb	[pc, r3]
+ 120              	.L11:
+ 121 000c 02       		.byte	(.L13-.L11)/2
+ 122 000d 0B       		.byte	(.L14-.L11)/2
+ 123 000e 05       		.byte	(.L12-.L11)/2
+ 124 000f 08       		.byte	(.L10-.L11)/2
+ 125              		.p2align 1
+ 126              	.L13:
+ 127 0010 B3EE040A 		vmov.f32	s0, #2.0e+1
+ 128 0014 7047     		bx	lr
+ 129              	.L12:
+  37:User_BSP/bsp_afe.c ****     case RREF_20R:
+  38:User_BSP/bsp_afe.c ****         return RREF_VALUE_20R;
+  39:User_BSP/bsp_afe.c ****     case RREF_1K:
+  40:User_BSP/bsp_afe.c ****         return RREF_VALUE_1K;
+  41:User_BSP/bsp_afe.c ****     case RREF_10K:
+  42:User_BSP/bsp_afe.c ****         return RREF_VALUE_10K;
+ 130              		.loc 1 42 9 view .LVU15
+ 131              		.loc 1 42 16 is_stmt 0 view .LVU16
+ 132 0016 9FED050A 		vldr.32	s0, .L15+4
+ 133 001a 7047     		bx	lr
+ 134              	.L10:
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 4
+
+
+  43:User_BSP/bsp_afe.c ****     case RREF_100K:
+  44:User_BSP/bsp_afe.c ****         return RREF_VALUE_100K;
+ 135              		.loc 1 44 9 is_stmt 1 view .LVU17
+ 136              		.loc 1 44 16 is_stmt 0 view .LVU18
+ 137 001c 9FED040A 		vldr.32	s0, .L15+8
+ 138 0020 7047     		bx	lr
+ 139              	.L14:
+  40:User_BSP/bsp_afe.c ****     case RREF_10K:
+ 140              		.loc 1 40 16 view .LVU19
+ 141 0022 9FED040A 		vldr.32	s0, .L15+12
+  45:User_BSP/bsp_afe.c ****     default:
+  46:User_BSP/bsp_afe.c ****         return RREF_VALUE_1K;
+  47:User_BSP/bsp_afe.c ****     }
+  48:User_BSP/bsp_afe.c **** }
+ 142              		.loc 1 48 1 view .LVU20
+ 143 0026 7047     		bx	lr
+ 144              	.L16:
+ 145              		.align	2
+ 146              	.L15:
+ 147 0028 00000000 		.word	.LANCHOR0
+ 148 002c 00401C46 		.word	1176256512
+ 149 0030 0050C347 		.word	1203982336
+ 150 0034 00007A44 		.word	1148846080
+ 151              		.cfi_endproc
+ 152              	.LFE242:
+ 154              		.section	.text.BSP_AFE_SetPGAGain,"ax",%progbits
+ 155              		.align	1
+ 156              		.global	BSP_AFE_SetPGAGain
+ 157              		.syntax unified
+ 158              		.thumb
+ 159              		.thumb_func
+ 161              	BSP_AFE_SetPGAGain:
+ 162              	.LVL4:
+ 163              	.LFB243:
+  49:User_BSP/bsp_afe.c **** 
+  50:User_BSP/bsp_afe.c **** void BSP_AFE_SetPGAGain(AFE_PGA_Gain_t gain)
+  51:User_BSP/bsp_afe.c **** {
+ 164              		.loc 1 51 1 is_stmt 1 view -0
+ 165              		.cfi_startproc
+ 166              		@ args = 0, pretend = 0, frame = 0
+ 167              		@ frame_needed = 0, uses_anonymous_args = 0
+ 168              		.loc 1 51 1 is_stmt 0 view .LVU22
+ 169 0000 38B5     		push	{r3, r4, r5, lr}
+ 170              	.LCFI1:
+ 171              		.cfi_def_cfa_offset 16
+ 172              		.cfi_offset 3, -16
+ 173              		.cfi_offset 4, -12
+ 174              		.cfi_offset 5, -8
+ 175              		.cfi_offset 14, -4
+ 176 0002 0446     		mov	r4, r0
+  52:User_BSP/bsp_afe.c ****     SET_S0S1((uint8_t)gain, S0_G_52_GPIO_Port, S0_G_52_Pin, S1_G_52_GPIO_Port, S1_G_52_Pin);
+ 177              		.loc 1 52 5 is_stmt 1 view .LVU23
+ 178              		.loc 1 52 5 view .LVU24
+ 179 0004 084D     		ldr	r5, .L19
+ 180 0006 00F00102 		and	r2, r0, #1
+ 181 000a 4FF40041 		mov	r1, #32768
+ 182 000e 2846     		mov	r0, r5
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 5
+
+
+ 183              	.LVL5:
+ 184              		.loc 1 52 5 is_stmt 0 view .LVU25
+ 185 0010 FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 186              	.LVL6:
+ 187              		.loc 1 52 5 is_stmt 1 view .LVU26
+ 188 0014 C4F34002 		ubfx	r2, r4, #1, #1
+ 189 0018 4FF48041 		mov	r1, #16384
+ 190 001c 2846     		mov	r0, r5
+ 191 001e FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 192              	.LVL7:
+ 193              		.loc 1 52 5 view .LVU27
+  53:User_BSP/bsp_afe.c ****     s_gain = gain;
+ 194              		.loc 1 53 5 view .LVU28
+ 195              		.loc 1 53 12 is_stmt 0 view .LVU29
+ 196 0022 024B     		ldr	r3, .L19+4
+ 197 0024 1C70     		strb	r4, [r3]
+  54:User_BSP/bsp_afe.c **** }
+ 198              		.loc 1 54 1 view .LVU30
+ 199 0026 38BD     		pop	{r3, r4, r5, pc}
+ 200              	.L20:
+ 201              		.align	2
+ 202              	.L19:
+ 203 0028 00040240 		.word	1073873920
+ 204 002c 00000000 		.word	.LANCHOR1
+ 205              		.cfi_endproc
+ 206              	.LFE243:
+ 208              		.section	.text.BSP_AFE_GetPGAGain,"ax",%progbits
+ 209              		.align	1
+ 210              		.global	BSP_AFE_GetPGAGain
+ 211              		.syntax unified
+ 212              		.thumb
+ 213              		.thumb_func
+ 215              	BSP_AFE_GetPGAGain:
+ 216              	.LFB244:
+  55:User_BSP/bsp_afe.c **** 
+  56:User_BSP/bsp_afe.c **** AFE_PGA_Gain_t BSP_AFE_GetPGAGain(void)
+  57:User_BSP/bsp_afe.c **** {
+ 217              		.loc 1 57 1 is_stmt 1 view -0
+ 218              		.cfi_startproc
+ 219              		@ args = 0, pretend = 0, frame = 0
+ 220              		@ frame_needed = 0, uses_anonymous_args = 0
+ 221              		@ link register save eliminated.
+  58:User_BSP/bsp_afe.c ****     return s_gain;
+ 222              		.loc 1 58 5 view .LVU32
+  59:User_BSP/bsp_afe.c **** }
+ 223              		.loc 1 59 1 is_stmt 0 view .LVU33
+ 224 0000 014B     		ldr	r3, .L22
+ 225 0002 1878     		ldrb	r0, [r3]	@ zero_extendqisi2
+ 226 0004 7047     		bx	lr
+ 227              	.L23:
+ 228 0006 00BF     		.align	2
+ 229              	.L22:
+ 230 0008 00000000 		.word	.LANCHOR1
+ 231              		.cfi_endproc
+ 232              	.LFE244:
+ 234              		.section	.text.BSP_AFE_SetLPF,"ax",%progbits
+ 235              		.align	1
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 6
+
+
+ 236              		.global	BSP_AFE_SetLPF
+ 237              		.syntax unified
+ 238              		.thumb
+ 239              		.thumb_func
+ 241              	BSP_AFE_SetLPF:
+ 242              	.LVL8:
+ 243              	.LFB245:
+  60:User_BSP/bsp_afe.c **** 
+  61:User_BSP/bsp_afe.c **** void BSP_AFE_SetLPF(AFE_LPF_Freq_t freq)
+  62:User_BSP/bsp_afe.c **** {
+ 244              		.loc 1 62 1 is_stmt 1 view -0
+ 245              		.cfi_startproc
+ 246              		@ args = 0, pretend = 0, frame = 0
+ 247              		@ frame_needed = 0, uses_anonymous_args = 0
+ 248              		.loc 1 62 1 is_stmt 0 view .LVU35
+ 249 0000 38B5     		push	{r3, r4, r5, lr}
+ 250              	.LCFI2:
+ 251              		.cfi_def_cfa_offset 16
+ 252              		.cfi_offset 3, -16
+ 253              		.cfi_offset 4, -12
+ 254              		.cfi_offset 5, -8
+ 255              		.cfi_offset 14, -4
+ 256 0002 0446     		mov	r4, r0
+  63:User_BSP/bsp_afe.c ****     SET_S0S1((uint8_t)freq, S0_FIL_52_GPIO_Port, S0_FIL_52_Pin, S1_FIL_52_GPIO_Port, S1_FIL_52_Pin)
+ 257              		.loc 1 63 5 is_stmt 1 view .LVU36
+ 258              		.loc 1 63 5 view .LVU37
+ 259 0004 084D     		ldr	r5, .L26
+ 260 0006 00F00102 		and	r2, r0, #1
+ 261 000a 4FF48051 		mov	r1, #4096
+ 262 000e 2846     		mov	r0, r5
+ 263              	.LVL9:
+ 264              		.loc 1 63 5 is_stmt 0 view .LVU38
+ 265 0010 FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 266              	.LVL10:
+ 267              		.loc 1 63 5 is_stmt 1 view .LVU39
+ 268 0014 C4F34002 		ubfx	r2, r4, #1, #1
+ 269 0018 4FF40051 		mov	r1, #8192
+ 270 001c 2846     		mov	r0, r5
+ 271 001e FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 272              	.LVL11:
+ 273              		.loc 1 63 5 view .LVU40
+  64:User_BSP/bsp_afe.c ****     s_lpf = freq;
+ 274              		.loc 1 64 5 view .LVU41
+ 275              		.loc 1 64 11 is_stmt 0 view .LVU42
+ 276 0022 024B     		ldr	r3, .L26+4
+ 277 0024 1C70     		strb	r4, [r3]
+  65:User_BSP/bsp_afe.c **** }
+ 278              		.loc 1 65 1 view .LVU43
+ 279 0026 38BD     		pop	{r3, r4, r5, pc}
+ 280              	.L27:
+ 281              		.align	2
+ 282              	.L26:
+ 283 0028 00040240 		.word	1073873920
+ 284 002c 00000000 		.word	.LANCHOR2
+ 285              		.cfi_endproc
+ 286              	.LFE245:
+ 288              		.section	.text.BSP_AFE_GetLPF,"ax",%progbits
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 7
+
+
+ 289              		.align	1
+ 290              		.global	BSP_AFE_GetLPF
+ 291              		.syntax unified
+ 292              		.thumb
+ 293              		.thumb_func
+ 295              	BSP_AFE_GetLPF:
+ 296              	.LFB246:
+  66:User_BSP/bsp_afe.c **** 
+  67:User_BSP/bsp_afe.c **** AFE_LPF_Freq_t BSP_AFE_GetLPF(void)
+  68:User_BSP/bsp_afe.c **** {
+ 297              		.loc 1 68 1 is_stmt 1 view -0
+ 298              		.cfi_startproc
+ 299              		@ args = 0, pretend = 0, frame = 0
+ 300              		@ frame_needed = 0, uses_anonymous_args = 0
+ 301              		@ link register save eliminated.
+  69:User_BSP/bsp_afe.c ****     return s_lpf;
+ 302              		.loc 1 69 5 view .LVU45
+  70:User_BSP/bsp_afe.c **** }
+ 303              		.loc 1 70 1 is_stmt 0 view .LVU46
+ 304 0000 014B     		ldr	r3, .L29
+ 305 0002 1878     		ldrb	r0, [r3]	@ zero_extendqisi2
+ 306 0004 7047     		bx	lr
+ 307              	.L30:
+ 308 0006 00BF     		.align	2
+ 309              	.L29:
+ 310 0008 00000000 		.word	.LANCHOR2
+ 311              		.cfi_endproc
+ 312              	.LFE246:
+ 314              		.section	.text.BSP_AFE_SetSigChannel,"ax",%progbits
+ 315              		.align	1
+ 316              		.global	BSP_AFE_SetSigChannel
+ 317              		.syntax unified
+ 318              		.thumb
+ 319              		.thumb_func
+ 321              	BSP_AFE_SetSigChannel:
+ 322              	.LVL12:
+ 323              	.LFB247:
+  71:User_BSP/bsp_afe.c **** 
+  72:User_BSP/bsp_afe.c **** void BSP_AFE_SetSigChannel(AFE_SigChannel_t ch)
+  73:User_BSP/bsp_afe.c **** {
+ 324              		.loc 1 73 1 is_stmt 1 view -0
+ 325              		.cfi_startproc
+ 326              		@ args = 0, pretend = 0, frame = 0
+ 327              		@ frame_needed = 0, uses_anonymous_args = 0
+ 328              		.loc 1 73 1 is_stmt 0 view .LVU48
+ 329 0000 08B5     		push	{r3, lr}
+ 330              	.LCFI3:
+ 331              		.cfi_def_cfa_offset 8
+ 332              		.cfi_offset 3, -8
+ 333              		.cfi_offset 14, -4
+  74:User_BSP/bsp_afe.c ****     HAL_GPIO_WritePin(S0_IO_53_GPIO_Port, S0_IO_53_Pin, (ch == SIG_CHANNEL_UR) ? GPIO_PIN_SET : GPI
+ 334              		.loc 1 74 5 is_stmt 1 view .LVU49
+ 335 0002 0128     		cmp	r0, #1
+ 336 0004 14BF     		ite	ne
+ 337 0006 0022     		movne	r2, #0
+ 338 0008 0122     		moveq	r2, #1
+ 339 000a 4FF40061 		mov	r1, #2048
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 8
+
+
+ 340 000e 0248     		ldr	r0, .L33
+ 341              	.LVL13:
+ 342              		.loc 1 74 5 is_stmt 0 view .LVU50
+ 343 0010 FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 344              	.LVL14:
+  75:User_BSP/bsp_afe.c **** }
+ 345              		.loc 1 75 1 view .LVU51
+ 346 0014 08BD     		pop	{r3, pc}
+ 347              	.L34:
+ 348 0016 00BF     		.align	2
+ 349              	.L33:
+ 350 0018 00080240 		.word	1073874944
+ 351              		.cfi_endproc
+ 352              	.LFE247:
+ 354              		.section	.text.BSP_AFE_SetPhase,"ax",%progbits
+ 355              		.align	1
+ 356              		.global	BSP_AFE_SetPhase
+ 357              		.syntax unified
+ 358              		.thumb
+ 359              		.thumb_func
+ 361              	BSP_AFE_SetPhase:
+ 362              	.LVL15:
+ 363              	.LFB248:
+  76:User_BSP/bsp_afe.c **** 
+  77:User_BSP/bsp_afe.c **** void BSP_AFE_SetPhase(AFE_Phase_t phase)
+  78:User_BSP/bsp_afe.c **** {
+ 364              		.loc 1 78 1 is_stmt 1 view -0
+ 365              		.cfi_startproc
+ 366              		@ args = 0, pretend = 0, frame = 0
+ 367              		@ frame_needed = 0, uses_anonymous_args = 0
+ 368              		.loc 1 78 1 is_stmt 0 view .LVU53
+ 369 0000 08B5     		push	{r3, lr}
+ 370              	.LCFI4:
+ 371              		.cfi_def_cfa_offset 8
+ 372              		.cfi_offset 3, -8
+ 373              		.cfi_offset 14, -4
+  79:User_BSP/bsp_afe.c ****     HAL_GPIO_WritePin(S1_IO_53_GPIO_Port, S1_IO_53_Pin, (phase == PHASE_90DEG) ? GPIO_PIN_SET : GPI
+ 374              		.loc 1 79 5 is_stmt 1 view .LVU54
+ 375 0002 0128     		cmp	r0, #1
+ 376 0004 14BF     		ite	ne
+ 377 0006 0022     		movne	r2, #0
+ 378 0008 0122     		moveq	r2, #1
+ 379 000a 4FF48061 		mov	r1, #1024
+ 380 000e 0248     		ldr	r0, .L37
+ 381              	.LVL16:
+ 382              		.loc 1 79 5 is_stmt 0 view .LVU55
+ 383 0010 FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 384              	.LVL17:
+  80:User_BSP/bsp_afe.c **** }
+ 385              		.loc 1 80 1 view .LVU56
+ 386 0014 08BD     		pop	{r3, pc}
+ 387              	.L38:
+ 388 0016 00BF     		.align	2
+ 389              	.L37:
+ 390 0018 00080240 		.word	1073874944
+ 391              		.cfi_endproc
+ 392              	.LFE248:
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 9
+
+
+ 394              		.section	.text.BSP_AFE_SetMeasureChannel,"ax",%progbits
+ 395              		.align	1
+ 396              		.global	BSP_AFE_SetMeasureChannel
+ 397              		.syntax unified
+ 398              		.thumb
+ 399              		.thumb_func
+ 401              	BSP_AFE_SetMeasureChannel:
+ 402              	.LVL18:
+ 403              	.LFB249:
+  81:User_BSP/bsp_afe.c **** 
+  82:User_BSP/bsp_afe.c **** void BSP_AFE_SetMeasureChannel(AFE_SigChannel_t ch, AFE_Phase_t phase)
+  83:User_BSP/bsp_afe.c **** {
+ 404              		.loc 1 83 1 is_stmt 1 view -0
+ 405              		.cfi_startproc
+ 406              		@ args = 0, pretend = 0, frame = 0
+ 407              		@ frame_needed = 0, uses_anonymous_args = 0
+ 408              		.loc 1 83 1 is_stmt 0 view .LVU58
+ 409 0000 10B5     		push	{r4, lr}
+ 410              	.LCFI5:
+ 411              		.cfi_def_cfa_offset 8
+ 412              		.cfi_offset 4, -8
+ 413              		.cfi_offset 14, -4
+ 414 0002 0C46     		mov	r4, r1
+  84:User_BSP/bsp_afe.c ****     BSP_AFE_SetSigChannel(ch);
+ 415              		.loc 1 84 5 is_stmt 1 view .LVU59
+ 416 0004 FFF7FEFF 		bl	BSP_AFE_SetSigChannel
+ 417              	.LVL19:
+  85:User_BSP/bsp_afe.c ****     BSP_AFE_SetPhase(phase);
+ 418              		.loc 1 85 5 view .LVU60
+ 419 0008 2046     		mov	r0, r4
+ 420 000a FFF7FEFF 		bl	BSP_AFE_SetPhase
+ 421              	.LVL20:
+  86:User_BSP/bsp_afe.c **** }
+ 422              		.loc 1 86 1 is_stmt 0 view .LVU61
+ 423 000e 10BD     		pop	{r4, pc}
+ 424              		.cfi_endproc
+ 425              	.LFE249:
+ 427              		.section	.text.BSP_AFE_SetDDSAmp,"ax",%progbits
+ 428              		.align	1
+ 429              		.global	BSP_AFE_SetDDSAmp
+ 430              		.syntax unified
+ 431              		.thumb
+ 432              		.thumb_func
+ 434              	BSP_AFE_SetDDSAmp:
+ 435              	.LVL21:
+ 436              	.LFB250:
+  87:User_BSP/bsp_afe.c **** 
+  88:User_BSP/bsp_afe.c **** void BSP_AFE_SetDDSAmp(AFE_DDS_Amp_t amp)
+  89:User_BSP/bsp_afe.c **** {
+ 437              		.loc 1 89 1 is_stmt 1 view -0
+ 438              		.cfi_startproc
+ 439              		@ args = 0, pretend = 0, frame = 0
+ 440              		@ frame_needed = 0, uses_anonymous_args = 0
+ 441              		.loc 1 89 1 is_stmt 0 view .LVU63
+ 442 0000 38B5     		push	{r3, r4, r5, lr}
+ 443              	.LCFI6:
+ 444              		.cfi_def_cfa_offset 16
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 10
+
+
+ 445              		.cfi_offset 3, -16
+ 446              		.cfi_offset 4, -12
+ 447              		.cfi_offset 5, -8
+ 448              		.cfi_offset 14, -4
+ 449 0002 0446     		mov	r4, r0
+  90:User_BSP/bsp_afe.c ****     SET_S0S1((uint8_t)amp, S0_DDS_52_GPIO_Port, S0_DDS_52_Pin, S1_DDS_52_GPIO_Port, S1_DDS_52_Pin);
+ 450              		.loc 1 90 5 is_stmt 1 view .LVU64
+ 451              		.loc 1 90 5 view .LVU65
+ 452 0004 084D     		ldr	r5, .L43
+ 453 0006 00F00102 		and	r2, r0, #1
+ 454 000a 4FF40071 		mov	r1, #512
+ 455 000e 2846     		mov	r0, r5
+ 456              	.LVL22:
+ 457              		.loc 1 90 5 is_stmt 0 view .LVU66
+ 458 0010 FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 459              	.LVL23:
+ 460              		.loc 1 90 5 is_stmt 1 view .LVU67
+ 461 0014 C4F34002 		ubfx	r2, r4, #1, #1
+ 462 0018 4FF48071 		mov	r1, #256
+ 463 001c 2846     		mov	r0, r5
+ 464 001e FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 465              	.LVL24:
+ 466              		.loc 1 90 5 view .LVU68
+  91:User_BSP/bsp_afe.c ****     s_amp = amp;
+ 467              		.loc 1 91 5 view .LVU69
+ 468              		.loc 1 91 11 is_stmt 0 view .LVU70
+ 469 0022 024B     		ldr	r3, .L43+4
+ 470 0024 1C70     		strb	r4, [r3]
+  92:User_BSP/bsp_afe.c **** }
+ 471              		.loc 1 92 1 view .LVU71
+ 472 0026 38BD     		pop	{r3, r4, r5, pc}
+ 473              	.L44:
+ 474              		.align	2
+ 475              	.L43:
+ 476 0028 00080240 		.word	1073874944
+ 477 002c 00000000 		.word	.LANCHOR3
+ 478              		.cfi_endproc
+ 479              	.LFE250:
+ 481              		.section	.text.BSP_AFE_Init,"ax",%progbits
+ 482              		.align	1
+ 483              		.global	BSP_AFE_Init
+ 484              		.syntax unified
+ 485              		.thumb
+ 486              		.thumb_func
+ 488              	BSP_AFE_Init:
+ 489              	.LFB239:
+  15:User_BSP/bsp_afe.c ****     BSP_AFE_SetRref(RREF_1K);
+ 490              		.loc 1 15 1 is_stmt 1 view -0
+ 491              		.cfi_startproc
+ 492              		@ args = 0, pretend = 0, frame = 0
+ 493              		@ frame_needed = 0, uses_anonymous_args = 0
+ 494 0000 08B5     		push	{r3, lr}
+ 495              	.LCFI7:
+ 496              		.cfi_def_cfa_offset 8
+ 497              		.cfi_offset 3, -8
+ 498              		.cfi_offset 14, -4
+  16:User_BSP/bsp_afe.c ****     BSP_AFE_SetPGAGain(PGA_GAIN_0);
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 11
+
+
+ 499              		.loc 1 16 5 view .LVU73
+ 500 0002 0120     		movs	r0, #1
+ 501 0004 FFF7FEFF 		bl	BSP_AFE_SetRref
+ 502              	.LVL25:
+  17:User_BSP/bsp_afe.c ****     BSP_AFE_SetLPF(LPF_1KHZ);
+ 503              		.loc 1 17 5 view .LVU74
+ 504 0008 0020     		movs	r0, #0
+ 505 000a FFF7FEFF 		bl	BSP_AFE_SetPGAGain
+ 506              	.LVL26:
+  18:User_BSP/bsp_afe.c ****     BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UX, PHASE_0DEG);
+ 507              		.loc 1 18 5 view .LVU75
+ 508 000e 0120     		movs	r0, #1
+ 509 0010 FFF7FEFF 		bl	BSP_AFE_SetLPF
+ 510              	.LVL27:
+  19:User_BSP/bsp_afe.c ****     BSP_AFE_SetDDSAmp(DDS_AMP_0V3);
+ 511              		.loc 1 19 5 view .LVU76
+ 512 0014 0021     		movs	r1, #0
+ 513 0016 0846     		mov	r0, r1
+ 514 0018 FFF7FEFF 		bl	BSP_AFE_SetMeasureChannel
+ 515              	.LVL28:
+  20:User_BSP/bsp_afe.c **** }
+ 516              		.loc 1 20 5 view .LVU77
+ 517 001c 0020     		movs	r0, #0
+ 518 001e FFF7FEFF 		bl	BSP_AFE_SetDDSAmp
+ 519              	.LVL29:
+  21:User_BSP/bsp_afe.c **** 
+ 520              		.loc 1 21 1 is_stmt 0 view .LVU78
+ 521 0022 08BD     		pop	{r3, pc}
+ 522              		.cfi_endproc
+ 523              	.LFE239:
+ 525              		.section	.text.BSP_AFE_GetDDSAmp,"ax",%progbits
+ 526              		.align	1
+ 527              		.global	BSP_AFE_GetDDSAmp
+ 528              		.syntax unified
+ 529              		.thumb
+ 530              		.thumb_func
+ 532              	BSP_AFE_GetDDSAmp:
+ 533              	.LFB251:
+  93:User_BSP/bsp_afe.c **** 
+  94:User_BSP/bsp_afe.c **** AFE_DDS_Amp_t BSP_AFE_GetDDSAmp(void)
+  95:User_BSP/bsp_afe.c **** {
+ 534              		.loc 1 95 1 is_stmt 1 view -0
+ 535              		.cfi_startproc
+ 536              		@ args = 0, pretend = 0, frame = 0
+ 537              		@ frame_needed = 0, uses_anonymous_args = 0
+ 538              		@ link register save eliminated.
+  96:User_BSP/bsp_afe.c ****     return s_amp;
+ 539              		.loc 1 96 5 view .LVU80
+  97:User_BSP/bsp_afe.c **** }
+ 540              		.loc 1 97 1 is_stmt 0 view .LVU81
+ 541 0000 014B     		ldr	r3, .L48
+ 542 0002 1878     		ldrb	r0, [r3]	@ zero_extendqisi2
+ 543 0004 7047     		bx	lr
+ 544              	.L49:
+ 545 0006 00BF     		.align	2
+ 546              	.L48:
+ 547 0008 00000000 		.word	.LANCHOR3
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 12
+
+
+ 548              		.cfi_endproc
+ 549              	.LFE251:
+ 551              		.section	.bss.s_amp,"aw",%nobits
+ 552              		.set	.LANCHOR3,. + 0
+ 555              	s_amp:
+ 556 0000 00       		.space	1
+ 557              		.section	.bss.s_gain,"aw",%nobits
+ 558              		.set	.LANCHOR1,. + 0
+ 561              	s_gain:
+ 562 0000 00       		.space	1
+ 563              		.section	.data.s_lpf,"aw"
+ 564              		.set	.LANCHOR2,. + 0
+ 567              	s_lpf:
+ 568 0000 01       		.byte	1
+ 569              		.section	.data.s_rref,"aw"
+ 570              		.set	.LANCHOR0,. + 0
+ 573              	s_rref:
+ 574 0000 01       		.byte	1
+ 575              		.text
+ 576              	.Letext0:
+ 577              		.file 2 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\machine\\_default_types.h"
+ 578              		.file 3 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\sys\\_stdint.h"
+ 579              		.file 4 "Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f405xx.h"
+ 580              		.file 5 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_gpio.h"
+ 581              		.file 6 "User_BSP/bsp_afe.h"
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s 			page 13
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 bsp_afe.c
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:20     .text.BSP_AFE_SetRref:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:26     .text.BSP_AFE_SetRref:00000000 BSP_AFE_SetRref
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:69     .text.BSP_AFE_SetRref:00000028 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:75     .text.BSP_AFE_GetRref:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:81     .text.BSP_AFE_GetRref:00000000 BSP_AFE_GetRref
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:96     .text.BSP_AFE_GetRref:00000008 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:101    .text.BSP_AFE_GetRrefValue:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:107    .text.BSP_AFE_GetRrefValue:00000000 BSP_AFE_GetRrefValue
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:121    .text.BSP_AFE_GetRrefValue:0000000c $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:125    .text.BSP_AFE_GetRrefValue:00000010 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:147    .text.BSP_AFE_GetRrefValue:00000028 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:155    .text.BSP_AFE_SetPGAGain:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:161    .text.BSP_AFE_SetPGAGain:00000000 BSP_AFE_SetPGAGain
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:203    .text.BSP_AFE_SetPGAGain:00000028 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:209    .text.BSP_AFE_GetPGAGain:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:215    .text.BSP_AFE_GetPGAGain:00000000 BSP_AFE_GetPGAGain
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:230    .text.BSP_AFE_GetPGAGain:00000008 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:235    .text.BSP_AFE_SetLPF:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:241    .text.BSP_AFE_SetLPF:00000000 BSP_AFE_SetLPF
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:283    .text.BSP_AFE_SetLPF:00000028 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:289    .text.BSP_AFE_GetLPF:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:295    .text.BSP_AFE_GetLPF:00000000 BSP_AFE_GetLPF
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:310    .text.BSP_AFE_GetLPF:00000008 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:315    .text.BSP_AFE_SetSigChannel:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:321    .text.BSP_AFE_SetSigChannel:00000000 BSP_AFE_SetSigChannel
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:350    .text.BSP_AFE_SetSigChannel:00000018 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:355    .text.BSP_AFE_SetPhase:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:361    .text.BSP_AFE_SetPhase:00000000 BSP_AFE_SetPhase
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:390    .text.BSP_AFE_SetPhase:00000018 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:395    .text.BSP_AFE_SetMeasureChannel:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:401    .text.BSP_AFE_SetMeasureChannel:00000000 BSP_AFE_SetMeasureChannel
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:428    .text.BSP_AFE_SetDDSAmp:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:434    .text.BSP_AFE_SetDDSAmp:00000000 BSP_AFE_SetDDSAmp
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:476    .text.BSP_AFE_SetDDSAmp:00000028 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:482    .text.BSP_AFE_Init:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:488    .text.BSP_AFE_Init:00000000 BSP_AFE_Init
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:526    .text.BSP_AFE_GetDDSAmp:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:532    .text.BSP_AFE_GetDDSAmp:00000000 BSP_AFE_GetDDSAmp
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:547    .text.BSP_AFE_GetDDSAmp:00000008 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:555    .bss.s_amp:00000000 s_amp
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:556    .bss.s_amp:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:561    .bss.s_gain:00000000 s_gain
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:562    .bss.s_gain:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:567    .data.s_lpf:00000000 s_lpf
+C:\Users\bubble\AppData\Local\Temp\ccfcivQ3.s:573    .data.s_rref:00000000 s_rref
+
+UNDEFINED SYMBOLS
+HAL_GPIO_WritePin

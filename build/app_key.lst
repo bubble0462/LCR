@@ -1,0 +1,734 @@
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 1
+
+
+   1              		.cpu cortex-m4
+   2              		.arch armv7e-m
+   3              		.fpu fpv4-sp-d16
+   4              		.eabi_attribute 27, 1
+   5              		.eabi_attribute 28, 1
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.file	"app_key.c"
+  16              		.text
+  17              	.Ltext0:
+  18              		.cfi_sections	.debug_frame
+  19              		.section	.text.App_Key_Read,"ax",%progbits
+  20              		.align	1
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	App_Key_Read:
+  26              	.LVL0:
+  27              	.LFB243:
+  28              		.file 1 "User_App/app_key.c"
+   1:User_App/app_key.c **** ﻿#include "app_key.h"
+   2:User_App/app_key.c **** 
+   3:User_App/app_key.c **** #include "cmsis_os.h"
+   4:User_App/app_key.c **** #include "main.h"
+   5:User_App/app_key.c **** 
+   6:User_App/app_key.c **** typedef enum {
+   7:User_App/app_key.c ****     KEY_STATE_IDLE = 0,
+   8:User_App/app_key.c ****     KEY_STATE_DEBOUNCE,
+   9:User_App/app_key.c ****     KEY_STATE_PRESSED,
+  10:User_App/app_key.c ****     KEY_STATE_LONG_SENT,
+  11:User_App/app_key.c **** } KeyState_t;
+  12:User_App/app_key.c **** 
+  13:User_App/app_key.c **** typedef struct {
+  14:User_App/app_key.c ****     KeyState_t state;
+  15:User_App/app_key.c ****     uint16_t ticks;
+  16:User_App/app_key.c ****     KeyCmd_t short_cmd;
+  17:User_App/app_key.c ****     KeyCmd_t long_cmd;
+  18:User_App/app_key.c **** } KeyCtx_t;
+  19:User_App/app_key.c **** 
+  20:User_App/app_key.c **** extern osMessageQueueId_t Queue_CmdHandle;
+  21:User_App/app_key.c **** 
+  22:User_App/app_key.c **** #define KEY_SCAN_PERIOD_MS 10u
+  23:User_App/app_key.c **** #define KEY_DEBOUNCE_MS 30u
+  24:User_App/app_key.c **** #define KEY_LONG_PRESS_MS 800u
+  25:User_App/app_key.c **** 
+  26:User_App/app_key.c **** #define KEY_DEBOUNCE_TICKS (KEY_DEBOUNCE_MS / KEY_SCAN_PERIOD_MS)
+  27:User_App/app_key.c **** #define KEY_LONG_TICKS (KEY_LONG_PRESS_MS / KEY_SCAN_PERIOD_MS)
+  28:User_App/app_key.c **** 
+  29:User_App/app_key.c **** #define KEY_PRESSED GPIO_PIN_RESET
+  30:User_App/app_key.c **** 
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 2
+
+
+  31:User_App/app_key.c **** #define KEY1_READ() HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin)
+  32:User_App/app_key.c **** #define KEY2_READ() HAL_GPIO_ReadPin(KEY2_GPIO_Port, KEY2_Pin)
+  33:User_App/app_key.c **** #define KEY3_READ() HAL_GPIO_ReadPin(KEY3_GPIO_Port, KEY3_Pin)
+  34:User_App/app_key.c **** #define KEY4_READ() HAL_GPIO_ReadPin(KEY4_GPIO_Port, KEY4_Pin)
+  35:User_App/app_key.c **** 
+  36:User_App/app_key.c **** static KeyCtx_t s_keys[4] = {
+  37:User_App/app_key.c ****     {KEY_STATE_IDLE, 0u, KEY_CMD_KEY1_SHORT, KEY_CMD_KEY1_LONG},
+  38:User_App/app_key.c ****     {KEY_STATE_IDLE, 0u, KEY_CMD_KEY2_SHORT, KEY_CMD_NONE},
+  39:User_App/app_key.c ****     {KEY_STATE_IDLE, 0u, KEY_CMD_KEY3_SHORT, KEY_CMD_NONE},
+  40:User_App/app_key.c ****     {KEY_STATE_IDLE, 0u, KEY_CMD_KEY4_SHORT, KEY_CMD_NONE},
+  41:User_App/app_key.c **** };
+  42:User_App/app_key.c **** 
+  43:User_App/app_key.c **** static GPIO_PinState App_Key_Read(uint8_t idx)
+  44:User_App/app_key.c **** {
+  29              		.loc 1 44 1 view -0
+  30              		.cfi_startproc
+  31              		@ args = 0, pretend = 0, frame = 0
+  32              		@ frame_needed = 0, uses_anonymous_args = 0
+  33              		.loc 1 44 1 is_stmt 0 view .LVU1
+  34 0000 08B5     		push	{r3, lr}
+  35              	.LCFI0:
+  36              		.cfi_def_cfa_offset 8
+  37              		.cfi_offset 3, -8
+  38              		.cfi_offset 14, -4
+  45:User_App/app_key.c ****     switch (idx) {
+  39              		.loc 1 45 5 is_stmt 1 view .LVU2
+  40 0002 0328     		cmp	r0, #3
+  41 0004 18D8     		bhi	.L8
+  42 0006 DFE800F0 		tbb	[pc, r0]
+  43              	.L4:
+  44 000a 02       		.byte	(.L7-.L4)/2
+  45 000b 08       		.byte	(.L6-.L4)/2
+  46 000c 0D       		.byte	(.L5-.L4)/2
+  47 000d 12       		.byte	(.L3-.L4)/2
+  48              		.p2align 1
+  49              	.L7:
+  46:User_App/app_key.c ****     case 0u:
+  47:User_App/app_key.c ****         return KEY1_READ();
+  50              		.loc 1 47 9 view .LVU3
+  51              		.loc 1 47 16 is_stmt 0 view .LVU4
+  52 000e 4FF40051 		mov	r1, #8192
+  53 0012 0A48     		ldr	r0, .L10
+  54              	.LVL1:
+  55              		.loc 1 47 16 view .LVU5
+  56 0014 FFF7FEFF 		bl	HAL_GPIO_ReadPin
+  57              	.LVL2:
+  58              	.L2:
+  48:User_App/app_key.c ****     case 1u:
+  49:User_App/app_key.c ****         return KEY2_READ();
+  50:User_App/app_key.c ****     case 2u:
+  51:User_App/app_key.c ****         return KEY3_READ();
+  52:User_App/app_key.c ****     case 3u:
+  53:User_App/app_key.c ****         return KEY4_READ();
+  54:User_App/app_key.c ****     default:
+  55:User_App/app_key.c ****         return GPIO_PIN_SET;
+  56:User_App/app_key.c ****     }
+  57:User_App/app_key.c **** }
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 3
+
+
+  59              		.loc 1 57 1 view .LVU6
+  60 0018 08BD     		pop	{r3, pc}
+  61              	.LVL3:
+  62              	.L6:
+  49:User_App/app_key.c ****     case 2u:
+  63              		.loc 1 49 9 is_stmt 1 view .LVU7
+  49:User_App/app_key.c ****     case 2u:
+  64              		.loc 1 49 16 is_stmt 0 view .LVU8
+  65 001a 0421     		movs	r1, #4
+  66 001c 0748     		ldr	r0, .L10
+  67              	.LVL4:
+  49:User_App/app_key.c ****     case 2u:
+  68              		.loc 1 49 16 view .LVU9
+  69 001e FFF7FEFF 		bl	HAL_GPIO_ReadPin
+  70              	.LVL5:
+  71 0022 F9E7     		b	.L2
+  72              	.LVL6:
+  73              	.L5:
+  51:User_App/app_key.c ****     case 3u:
+  74              		.loc 1 51 9 is_stmt 1 view .LVU10
+  51:User_App/app_key.c ****     case 3u:
+  75              		.loc 1 51 16 is_stmt 0 view .LVU11
+  76 0024 0821     		movs	r1, #8
+  77 0026 0548     		ldr	r0, .L10
+  78              	.LVL7:
+  51:User_App/app_key.c ****     case 3u:
+  79              		.loc 1 51 16 view .LVU12
+  80 0028 FFF7FEFF 		bl	HAL_GPIO_ReadPin
+  81              	.LVL8:
+  82 002c F4E7     		b	.L2
+  83              	.LVL9:
+  84              	.L3:
+  53:User_App/app_key.c ****     default:
+  85              		.loc 1 53 9 is_stmt 1 view .LVU13
+  53:User_App/app_key.c ****     default:
+  86              		.loc 1 53 16 is_stmt 0 view .LVU14
+  87 002e 1021     		movs	r1, #16
+  88 0030 0248     		ldr	r0, .L10
+  89              	.LVL10:
+  53:User_App/app_key.c ****     default:
+  90              		.loc 1 53 16 view .LVU15
+  91 0032 FFF7FEFF 		bl	HAL_GPIO_ReadPin
+  92              	.LVL11:
+  93 0036 EFE7     		b	.L2
+  94              	.LVL12:
+  95              	.L8:
+  45:User_App/app_key.c ****     case 0u:
+  96              		.loc 1 45 5 view .LVU16
+  97 0038 0120     		movs	r0, #1
+  98              	.LVL13:
+  45:User_App/app_key.c ****     case 0u:
+  99              		.loc 1 45 5 view .LVU17
+ 100 003a EDE7     		b	.L2
+ 101              	.L11:
+ 102              		.align	2
+ 103              	.L10:
+ 104 003c 00080240 		.word	1073874944
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 4
+
+
+ 105              		.cfi_endproc
+ 106              	.LFE243:
+ 108              		.section	.text.App_Key_Send,"ax",%progbits
+ 109              		.align	1
+ 110              		.syntax unified
+ 111              		.thumb
+ 112              		.thumb_func
+ 114              	App_Key_Send:
+ 115              	.LVL14:
+ 116              	.LFB244:
+  58:User_App/app_key.c **** 
+  59:User_App/app_key.c **** static void App_Key_Send(KeyCmd_t cmd)
+  60:User_App/app_key.c **** {
+ 117              		.loc 1 60 1 is_stmt 1 view -0
+ 118              		.cfi_startproc
+ 119              		@ args = 0, pretend = 0, frame = 8
+ 120              		@ frame_needed = 0, uses_anonymous_args = 0
+  61:User_App/app_key.c ****     uint8_t raw;
+ 121              		.loc 1 61 5 view .LVU19
+  62:User_App/app_key.c **** 
+  63:User_App/app_key.c ****     if (cmd == KEY_CMD_NONE) {
+ 122              		.loc 1 63 5 view .LVU20
+ 123              		.loc 1 63 8 is_stmt 0 view .LVU21
+ 124 0000 00B9     		cbnz	r0, .L19
+ 125 0002 7047     		bx	lr
+ 126              	.L19:
+  60:User_App/app_key.c ****     uint8_t raw;
+ 127              		.loc 1 60 1 view .LVU22
+ 128 0004 00B5     		push	{lr}
+ 129              	.LCFI1:
+ 130              		.cfi_def_cfa_offset 4
+ 131              		.cfi_offset 14, -4
+ 132 0006 83B0     		sub	sp, sp, #12
+ 133              	.LCFI2:
+ 134              		.cfi_def_cfa_offset 16
+  64:User_App/app_key.c ****         return;
+  65:User_App/app_key.c ****     }
+  66:User_App/app_key.c **** 
+  67:User_App/app_key.c ****     raw = (uint8_t)cmd;
+ 135              		.loc 1 67 5 is_stmt 1 view .LVU23
+ 136              		.loc 1 67 9 is_stmt 0 view .LVU24
+ 137 0008 8DF80700 		strb	r0, [sp, #7]
+  68:User_App/app_key.c ****     (void)osMessageQueuePut(Queue_CmdHandle, &raw, 0u, 0u);
+ 138              		.loc 1 68 5 is_stmt 1 view .LVU25
+ 139              		.loc 1 68 11 is_stmt 0 view .LVU26
+ 140 000c 0023     		movs	r3, #0
+ 141 000e 1A46     		mov	r2, r3
+ 142 0010 0DF10701 		add	r1, sp, #7
+ 143 0014 0348     		ldr	r0, .L20
+ 144              	.LVL15:
+ 145              		.loc 1 68 11 view .LVU27
+ 146 0016 0068     		ldr	r0, [r0]
+ 147 0018 FFF7FEFF 		bl	osMessageQueuePut
+ 148              	.LVL16:
+  69:User_App/app_key.c **** }
+ 149              		.loc 1 69 1 view .LVU28
+ 150 001c 03B0     		add	sp, sp, #12
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 5
+
+
+ 151              	.LCFI3:
+ 152              		.cfi_def_cfa_offset 4
+ 153              		@ sp needed
+ 154 001e 5DF804FB 		ldr	pc, [sp], #4
+ 155              	.L21:
+ 156 0022 00BF     		.align	2
+ 157              	.L20:
+ 158 0024 00000000 		.word	Queue_CmdHandle
+ 159              		.cfi_endproc
+ 160              	.LFE244:
+ 162              		.section	.text.App_Key_UpdateOne,"ax",%progbits
+ 163              		.align	1
+ 164              		.syntax unified
+ 165              		.thumb
+ 166              		.thumb_func
+ 168              	App_Key_UpdateOne:
+ 169              	.LVL17:
+ 170              	.LFB245:
+  70:User_App/app_key.c **** 
+  71:User_App/app_key.c **** static void App_Key_UpdateOne(KeyCtx_t *key, GPIO_PinState level)
+  72:User_App/app_key.c **** {
+ 171              		.loc 1 72 1 is_stmt 1 view -0
+ 172              		.cfi_startproc
+ 173              		@ args = 0, pretend = 0, frame = 0
+ 174              		@ frame_needed = 0, uses_anonymous_args = 0
+ 175              		.loc 1 72 1 is_stmt 0 view .LVU30
+ 176 0000 10B5     		push	{r4, lr}
+ 177              	.LCFI4:
+ 178              		.cfi_def_cfa_offset 8
+ 179              		.cfi_offset 4, -8
+ 180              		.cfi_offset 14, -4
+ 181 0002 0446     		mov	r4, r0
+  73:User_App/app_key.c ****     switch (key->state) {
+ 182              		.loc 1 73 5 is_stmt 1 view .LVU31
+ 183              		.loc 1 73 16 is_stmt 0 view .LVU32
+ 184 0004 0378     		ldrb	r3, [r0]	@ zero_extendqisi2
+ 185              		.loc 1 73 5 view .LVU33
+ 186 0006 032B     		cmp	r3, #3
+ 187 0008 37D8     		bhi	.L23
+ 188 000a DFE803F0 		tbb	[pc, r3]
+ 189              	.L25:
+ 190 000e 02       		.byte	(.L28-.L25)/2
+ 191 000f 08       		.byte	(.L27-.L25)/2
+ 192 0010 18       		.byte	(.L26-.L25)/2
+ 193 0011 30       		.byte	(.L24-.L25)/2
+ 194              		.p2align 1
+ 195              	.L28:
+  74:User_App/app_key.c ****     case KEY_STATE_IDLE:
+  75:User_App/app_key.c ****         if (level == KEY_PRESSED) {
+ 196              		.loc 1 75 9 is_stmt 1 view .LVU34
+ 197              		.loc 1 75 12 is_stmt 0 view .LVU35
+ 198 0012 19B9     		cbnz	r1, .L22
+  76:User_App/app_key.c ****             key->state = KEY_STATE_DEBOUNCE;
+ 199              		.loc 1 76 13 is_stmt 1 view .LVU36
+ 200              		.loc 1 76 24 is_stmt 0 view .LVU37
+ 201 0014 0123     		movs	r3, #1
+ 202 0016 0370     		strb	r3, [r0]
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 6
+
+
+  77:User_App/app_key.c ****             key->ticks = 0u;
+ 203              		.loc 1 77 13 is_stmt 1 view .LVU38
+ 204              		.loc 1 77 24 is_stmt 0 view .LVU39
+ 205 0018 0023     		movs	r3, #0
+ 206 001a 4380     		strh	r3, [r0, #2]	@ movhi
+ 207              	.LVL18:
+ 208              	.L22:
+  78:User_App/app_key.c ****         }
+  79:User_App/app_key.c ****         break;
+  80:User_App/app_key.c **** 
+  81:User_App/app_key.c ****     case KEY_STATE_DEBOUNCE:
+  82:User_App/app_key.c ****         if (level == KEY_PRESSED) {
+  83:User_App/app_key.c ****             key->ticks++;
+  84:User_App/app_key.c ****             if (key->ticks >= KEY_DEBOUNCE_TICKS) {
+  85:User_App/app_key.c ****                 key->state = KEY_STATE_PRESSED;
+  86:User_App/app_key.c ****                 key->ticks = 0u;
+  87:User_App/app_key.c ****             }
+  88:User_App/app_key.c ****         } else {
+  89:User_App/app_key.c ****             key->state = KEY_STATE_IDLE;
+  90:User_App/app_key.c ****             key->ticks = 0u;
+  91:User_App/app_key.c ****         }
+  92:User_App/app_key.c ****         break;
+  93:User_App/app_key.c **** 
+  94:User_App/app_key.c ****     case KEY_STATE_PRESSED:
+  95:User_App/app_key.c ****         if (level != KEY_PRESSED) {
+  96:User_App/app_key.c ****             App_Key_Send(key->short_cmd);
+  97:User_App/app_key.c ****             key->state = KEY_STATE_IDLE;
+  98:User_App/app_key.c ****             key->ticks = 0u;
+  99:User_App/app_key.c ****         } else {
+ 100:User_App/app_key.c ****             key->ticks++;
+ 101:User_App/app_key.c ****             if ((key->long_cmd != KEY_CMD_NONE) && (key->ticks >= KEY_LONG_TICKS)) {
+ 102:User_App/app_key.c ****                 App_Key_Send(key->long_cmd);
+ 103:User_App/app_key.c ****                 key->state = KEY_STATE_LONG_SENT;
+ 104:User_App/app_key.c ****                 key->ticks = 0u;
+ 105:User_App/app_key.c ****             }
+ 106:User_App/app_key.c ****         }
+ 107:User_App/app_key.c ****         break;
+ 108:User_App/app_key.c **** 
+ 109:User_App/app_key.c ****     case KEY_STATE_LONG_SENT:
+ 110:User_App/app_key.c ****         if (level != KEY_PRESSED) {
+ 111:User_App/app_key.c ****             key->state = KEY_STATE_IDLE;
+ 112:User_App/app_key.c ****             key->ticks = 0u;
+ 113:User_App/app_key.c ****         }
+ 114:User_App/app_key.c ****         break;
+ 115:User_App/app_key.c **** 
+ 116:User_App/app_key.c ****     default:
+ 117:User_App/app_key.c ****         key->state = KEY_STATE_IDLE;
+ 118:User_App/app_key.c ****         key->ticks = 0u;
+ 119:User_App/app_key.c ****         break;
+ 120:User_App/app_key.c ****     }
+ 121:User_App/app_key.c **** }
+ 209              		.loc 1 121 1 view .LVU40
+ 210 001c 10BD     		pop	{r4, pc}
+ 211              	.LVL19:
+ 212              	.L27:
+  82:User_App/app_key.c ****             key->ticks++;
+ 213              		.loc 1 82 9 is_stmt 1 view .LVU41
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 7
+
+
+  82:User_App/app_key.c ****             key->ticks++;
+ 214              		.loc 1 82 12 is_stmt 0 view .LVU42
+ 215 001e 51B9     		cbnz	r1, .L30
+  83:User_App/app_key.c ****             if (key->ticks >= KEY_DEBOUNCE_TICKS) {
+ 216              		.loc 1 83 13 is_stmt 1 view .LVU43
+  83:User_App/app_key.c ****             if (key->ticks >= KEY_DEBOUNCE_TICKS) {
+ 217              		.loc 1 83 16 is_stmt 0 view .LVU44
+ 218 0020 4388     		ldrh	r3, [r0, #2]
+  83:User_App/app_key.c ****             if (key->ticks >= KEY_DEBOUNCE_TICKS) {
+ 219              		.loc 1 83 23 view .LVU45
+ 220 0022 0133     		adds	r3, r3, #1
+ 221 0024 9BB2     		uxth	r3, r3
+ 222 0026 4380     		strh	r3, [r0, #2]	@ movhi
+  84:User_App/app_key.c ****                 key->state = KEY_STATE_PRESSED;
+ 223              		.loc 1 84 13 is_stmt 1 view .LVU46
+  84:User_App/app_key.c ****                 key->state = KEY_STATE_PRESSED;
+ 224              		.loc 1 84 16 is_stmt 0 view .LVU47
+ 225 0028 022B     		cmp	r3, #2
+ 226 002a F7D9     		bls	.L22
+  85:User_App/app_key.c ****                 key->ticks = 0u;
+ 227              		.loc 1 85 17 is_stmt 1 view .LVU48
+  85:User_App/app_key.c ****                 key->ticks = 0u;
+ 228              		.loc 1 85 28 is_stmt 0 view .LVU49
+ 229 002c 0223     		movs	r3, #2
+ 230 002e 0370     		strb	r3, [r0]
+  86:User_App/app_key.c ****             }
+ 231              		.loc 1 86 17 is_stmt 1 view .LVU50
+  86:User_App/app_key.c ****             }
+ 232              		.loc 1 86 28 is_stmt 0 view .LVU51
+ 233 0030 0023     		movs	r3, #0
+ 234 0032 4380     		strh	r3, [r0, #2]	@ movhi
+ 235 0034 F2E7     		b	.L22
+ 236              	.L30:
+  89:User_App/app_key.c ****             key->ticks = 0u;
+ 237              		.loc 1 89 13 is_stmt 1 view .LVU52
+  89:User_App/app_key.c ****             key->ticks = 0u;
+ 238              		.loc 1 89 24 is_stmt 0 view .LVU53
+ 239 0036 0023     		movs	r3, #0
+ 240 0038 0370     		strb	r3, [r0]
+  90:User_App/app_key.c ****         }
+ 241              		.loc 1 90 13 is_stmt 1 view .LVU54
+  90:User_App/app_key.c ****         }
+ 242              		.loc 1 90 24 is_stmt 0 view .LVU55
+ 243 003a 4380     		strh	r3, [r0, #2]	@ movhi
+ 244 003c EEE7     		b	.L22
+ 245              	.L26:
+  95:User_App/app_key.c ****             App_Key_Send(key->short_cmd);
+ 246              		.loc 1 95 9 is_stmt 1 view .LVU56
+  95:User_App/app_key.c ****             App_Key_Send(key->short_cmd);
+ 247              		.loc 1 95 12 is_stmt 0 view .LVU57
+ 248 003e 79B9     		cbnz	r1, .L33
+ 100:User_App/app_key.c ****             if ((key->long_cmd != KEY_CMD_NONE) && (key->ticks >= KEY_LONG_TICKS)) {
+ 249              		.loc 1 100 13 is_stmt 1 view .LVU58
+ 100:User_App/app_key.c ****             if ((key->long_cmd != KEY_CMD_NONE) && (key->ticks >= KEY_LONG_TICKS)) {
+ 250              		.loc 1 100 16 is_stmt 0 view .LVU59
+ 251 0040 4388     		ldrh	r3, [r0, #2]
+ 100:User_App/app_key.c ****             if ((key->long_cmd != KEY_CMD_NONE) && (key->ticks >= KEY_LONG_TICKS)) {
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 8
+
+
+ 252              		.loc 1 100 23 view .LVU60
+ 253 0042 0133     		adds	r3, r3, #1
+ 254 0044 9BB2     		uxth	r3, r3
+ 255 0046 4380     		strh	r3, [r0, #2]	@ movhi
+ 101:User_App/app_key.c ****                 App_Key_Send(key->long_cmd);
+ 256              		.loc 1 101 13 is_stmt 1 view .LVU61
+ 101:User_App/app_key.c ****                 App_Key_Send(key->long_cmd);
+ 257              		.loc 1 101 21 is_stmt 0 view .LVU62
+ 258 0048 4079     		ldrb	r0, [r0, #5]	@ zero_extendqisi2
+ 259              	.LVL20:
+ 101:User_App/app_key.c ****                 App_Key_Send(key->long_cmd);
+ 260              		.loc 1 101 16 view .LVU63
+ 261 004a 0028     		cmp	r0, #0
+ 262 004c E6D0     		beq	.L22
+ 101:User_App/app_key.c ****                 App_Key_Send(key->long_cmd);
+ 263              		.loc 1 101 49 discriminator 1 view .LVU64
+ 264 004e 4F2B     		cmp	r3, #79
+ 265 0050 E4D9     		bls	.L22
+ 102:User_App/app_key.c ****                 key->state = KEY_STATE_LONG_SENT;
+ 266              		.loc 1 102 17 is_stmt 1 view .LVU65
+ 267 0052 FFF7FEFF 		bl	App_Key_Send
+ 268              	.LVL21:
+ 103:User_App/app_key.c ****                 key->ticks = 0u;
+ 269              		.loc 1 103 17 view .LVU66
+ 103:User_App/app_key.c ****                 key->ticks = 0u;
+ 270              		.loc 1 103 28 is_stmt 0 view .LVU67
+ 271 0056 0323     		movs	r3, #3
+ 272 0058 2370     		strb	r3, [r4]
+ 104:User_App/app_key.c ****             }
+ 273              		.loc 1 104 17 is_stmt 1 view .LVU68
+ 104:User_App/app_key.c ****             }
+ 274              		.loc 1 104 28 is_stmt 0 view .LVU69
+ 275 005a 0023     		movs	r3, #0
+ 276 005c 6380     		strh	r3, [r4, #2]	@ movhi
+ 277 005e DDE7     		b	.L22
+ 278              	.LVL22:
+ 279              	.L33:
+  96:User_App/app_key.c ****             key->state = KEY_STATE_IDLE;
+ 280              		.loc 1 96 13 is_stmt 1 view .LVU70
+ 281 0060 0079     		ldrb	r0, [r0, #4]	@ zero_extendqisi2
+ 282              	.LVL23:
+  96:User_App/app_key.c ****             key->state = KEY_STATE_IDLE;
+ 283              		.loc 1 96 13 is_stmt 0 view .LVU71
+ 284 0062 FFF7FEFF 		bl	App_Key_Send
+ 285              	.LVL24:
+  97:User_App/app_key.c ****             key->ticks = 0u;
+ 286              		.loc 1 97 13 is_stmt 1 view .LVU72
+  97:User_App/app_key.c ****             key->ticks = 0u;
+ 287              		.loc 1 97 24 is_stmt 0 view .LVU73
+ 288 0066 0023     		movs	r3, #0
+ 289 0068 2370     		strb	r3, [r4]
+  98:User_App/app_key.c ****         } else {
+ 290              		.loc 1 98 13 is_stmt 1 view .LVU74
+  98:User_App/app_key.c ****         } else {
+ 291              		.loc 1 98 24 is_stmt 0 view .LVU75
+ 292 006a 6380     		strh	r3, [r4, #2]	@ movhi
+ 293 006c D6E7     		b	.L22
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 9
+
+
+ 294              	.LVL25:
+ 295              	.L24:
+ 110:User_App/app_key.c ****             key->state = KEY_STATE_IDLE;
+ 296              		.loc 1 110 9 is_stmt 1 view .LVU76
+ 110:User_App/app_key.c ****             key->state = KEY_STATE_IDLE;
+ 297              		.loc 1 110 12 is_stmt 0 view .LVU77
+ 298 006e 0029     		cmp	r1, #0
+ 299 0070 D4D0     		beq	.L22
+ 111:User_App/app_key.c ****             key->ticks = 0u;
+ 300              		.loc 1 111 13 is_stmt 1 view .LVU78
+ 111:User_App/app_key.c ****             key->ticks = 0u;
+ 301              		.loc 1 111 24 is_stmt 0 view .LVU79
+ 302 0072 0023     		movs	r3, #0
+ 303 0074 0370     		strb	r3, [r0]
+ 112:User_App/app_key.c ****         }
+ 304              		.loc 1 112 13 is_stmt 1 view .LVU80
+ 112:User_App/app_key.c ****         }
+ 305              		.loc 1 112 24 is_stmt 0 view .LVU81
+ 306 0076 4380     		strh	r3, [r0, #2]	@ movhi
+ 307 0078 D0E7     		b	.L22
+ 308              	.L23:
+ 117:User_App/app_key.c ****         key->ticks = 0u;
+ 309              		.loc 1 117 9 is_stmt 1 view .LVU82
+ 117:User_App/app_key.c ****         key->ticks = 0u;
+ 310              		.loc 1 117 20 is_stmt 0 view .LVU83
+ 311 007a 0023     		movs	r3, #0
+ 312 007c 0370     		strb	r3, [r0]
+ 118:User_App/app_key.c ****         break;
+ 313              		.loc 1 118 9 is_stmt 1 view .LVU84
+ 118:User_App/app_key.c ****         break;
+ 314              		.loc 1 118 20 is_stmt 0 view .LVU85
+ 315 007e 4380     		strh	r3, [r0, #2]	@ movhi
+ 119:User_App/app_key.c ****     }
+ 316              		.loc 1 119 9 is_stmt 1 view .LVU86
+ 317              		.loc 1 121 1 is_stmt 0 view .LVU87
+ 318 0080 CCE7     		b	.L22
+ 319              		.cfi_endproc
+ 320              	.LFE245:
+ 322              		.section	.text.App_Key_Init,"ax",%progbits
+ 323              		.align	1
+ 324              		.global	App_Key_Init
+ 325              		.syntax unified
+ 326              		.thumb
+ 327              		.thumb_func
+ 329              	App_Key_Init:
+ 330              	.LFB246:
+ 122:User_App/app_key.c **** 
+ 123:User_App/app_key.c **** void App_Key_Init(void)
+ 124:User_App/app_key.c **** {
+ 331              		.loc 1 124 1 is_stmt 1 view -0
+ 332              		.cfi_startproc
+ 333              		@ args = 0, pretend = 0, frame = 0
+ 334              		@ frame_needed = 0, uses_anonymous_args = 0
+ 335              		@ link register save eliminated.
+ 125:User_App/app_key.c ****     uint32_t i;
+ 336              		.loc 1 125 5 view .LVU89
+ 126:User_App/app_key.c ****     for (i = 0u; i < 4u; i++) {
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 10
+
+
+ 337              		.loc 1 126 5 view .LVU90
+ 338              	.LVL26:
+ 339              		.loc 1 126 12 is_stmt 0 view .LVU91
+ 340 0000 0023     		movs	r3, #0
+ 341              		.loc 1 126 5 view .LVU92
+ 342 0002 0AE0     		b	.L35
+ 343              	.LVL27:
+ 344              	.L36:
+ 127:User_App/app_key.c ****         s_keys[i].state = KEY_STATE_IDLE;
+ 345              		.loc 1 127 9 is_stmt 1 discriminator 3 view .LVU93
+ 346              		.loc 1 127 25 is_stmt 0 discriminator 3 view .LVU94
+ 347 0004 0648     		ldr	r0, .L37
+ 348 0006 03EB4301 		add	r1, r3, r3, lsl #1
+ 349 000a 4A00     		lsls	r2, r1, #1
+ 350 000c 00EB020C 		add	ip, r0, r2
+ 351 0010 0021     		movs	r1, #0
+ 352 0012 8154     		strb	r1, [r0, r2]
+ 128:User_App/app_key.c ****         s_keys[i].ticks = 0u;
+ 353              		.loc 1 128 9 is_stmt 1 discriminator 3 view .LVU95
+ 354              		.loc 1 128 25 is_stmt 0 discriminator 3 view .LVU96
+ 355 0014 ACF80210 		strh	r1, [ip, #2]	@ movhi
+ 126:User_App/app_key.c ****     for (i = 0u; i < 4u; i++) {
+ 356              		.loc 1 126 26 is_stmt 1 discriminator 3 view .LVU97
+ 126:User_App/app_key.c ****     for (i = 0u; i < 4u; i++) {
+ 357              		.loc 1 126 27 is_stmt 0 discriminator 3 view .LVU98
+ 358 0018 0133     		adds	r3, r3, #1
+ 359              	.LVL28:
+ 360              	.L35:
+ 126:User_App/app_key.c ****     for (i = 0u; i < 4u; i++) {
+ 361              		.loc 1 126 18 is_stmt 1 discriminator 1 view .LVU99
+ 126:User_App/app_key.c ****     for (i = 0u; i < 4u; i++) {
+ 362              		.loc 1 126 5 is_stmt 0 discriminator 1 view .LVU100
+ 363 001a 032B     		cmp	r3, #3
+ 364 001c F2D9     		bls	.L36
+ 129:User_App/app_key.c ****     }
+ 130:User_App/app_key.c **** }
+ 365              		.loc 1 130 1 view .LVU101
+ 366 001e 7047     		bx	lr
+ 367              	.L38:
+ 368              		.align	2
+ 369              	.L37:
+ 370 0020 00000000 		.word	.LANCHOR0
+ 371              		.cfi_endproc
+ 372              	.LFE246:
+ 374              		.section	.text.App_Key_Run,"ax",%progbits
+ 375              		.align	1
+ 376              		.global	App_Key_Run
+ 377              		.syntax unified
+ 378              		.thumb
+ 379              		.thumb_func
+ 381              	App_Key_Run:
+ 382              	.LFB247:
+ 131:User_App/app_key.c **** 
+ 132:User_App/app_key.c **** void App_Key_Run(void)
+ 133:User_App/app_key.c **** {
+ 383              		.loc 1 133 1 is_stmt 1 view -0
+ 384              		.cfi_startproc
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 11
+
+
+ 385              		@ args = 0, pretend = 0, frame = 0
+ 386              		@ frame_needed = 0, uses_anonymous_args = 0
+ 387 0000 10B5     		push	{r4, lr}
+ 388              	.LCFI5:
+ 389              		.cfi_def_cfa_offset 8
+ 390              		.cfi_offset 4, -8
+ 391              		.cfi_offset 14, -4
+ 134:User_App/app_key.c ****     uint8_t i;
+ 392              		.loc 1 134 5 view .LVU103
+ 135:User_App/app_key.c **** 
+ 136:User_App/app_key.c ****     for (i = 0u; i < 4u; i++) {
+ 393              		.loc 1 136 5 view .LVU104
+ 394              	.LVL29:
+ 395              		.loc 1 136 12 is_stmt 0 view .LVU105
+ 396 0002 0024     		movs	r4, #0
+ 397              		.loc 1 136 5 view .LVU106
+ 398 0004 0CE0     		b	.L40
+ 399              	.LVL30:
+ 400              	.L41:
+ 137:User_App/app_key.c ****         App_Key_UpdateOne(&s_keys[i], App_Key_Read(i));
+ 401              		.loc 1 137 9 is_stmt 1 discriminator 3 view .LVU107
+ 402 0006 2046     		mov	r0, r4
+ 403 0008 FFF7FEFF 		bl	App_Key_Read
+ 404              	.LVL31:
+ 405 000c 0146     		mov	r1, r0
+ 406 000e 04EB4402 		add	r2, r4, r4, lsl #1
+ 407 0012 0648     		ldr	r0, .L43
+ 408 0014 00EB4200 		add	r0, r0, r2, lsl #1
+ 409 0018 FFF7FEFF 		bl	App_Key_UpdateOne
+ 410              	.LVL32:
+ 136:User_App/app_key.c ****         App_Key_UpdateOne(&s_keys[i], App_Key_Read(i));
+ 411              		.loc 1 136 26 discriminator 3 view .LVU108
+ 136:User_App/app_key.c ****         App_Key_UpdateOne(&s_keys[i], App_Key_Read(i));
+ 412              		.loc 1 136 27 is_stmt 0 discriminator 3 view .LVU109
+ 413 001c 0134     		adds	r4, r4, #1
+ 414              	.LVL33:
+ 136:User_App/app_key.c ****         App_Key_UpdateOne(&s_keys[i], App_Key_Read(i));
+ 415              		.loc 1 136 27 discriminator 3 view .LVU110
+ 416 001e E4B2     		uxtb	r4, r4
+ 417              	.LVL34:
+ 418              	.L40:
+ 136:User_App/app_key.c ****         App_Key_UpdateOne(&s_keys[i], App_Key_Read(i));
+ 419              		.loc 1 136 18 is_stmt 1 discriminator 1 view .LVU111
+ 136:User_App/app_key.c ****         App_Key_UpdateOne(&s_keys[i], App_Key_Read(i));
+ 420              		.loc 1 136 5 is_stmt 0 discriminator 1 view .LVU112
+ 421 0020 032C     		cmp	r4, #3
+ 422 0022 F0D9     		bls	.L41
+ 138:User_App/app_key.c ****     }
+ 139:User_App/app_key.c **** 
+ 140:User_App/app_key.c ****     osDelay(KEY_SCAN_PERIOD_MS);
+ 423              		.loc 1 140 5 is_stmt 1 view .LVU113
+ 424 0024 0A20     		movs	r0, #10
+ 425 0026 FFF7FEFF 		bl	osDelay
+ 426              	.LVL35:
+ 141:User_App/app_key.c **** }
+ 427              		.loc 1 141 1 is_stmt 0 view .LVU114
+ 428 002a 10BD     		pop	{r4, pc}
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 12
+
+
+ 429              	.LVL36:
+ 430              	.L44:
+ 431              		.loc 1 141 1 view .LVU115
+ 432              		.align	2
+ 433              	.L43:
+ 434 002c 00000000 		.word	.LANCHOR0
+ 435              		.cfi_endproc
+ 436              	.LFE247:
+ 438              		.section	.data.s_keys,"aw"
+ 439              		.align	2
+ 440              		.set	.LANCHOR0,. + 0
+ 443              	s_keys:
+ 444 0000 00       		.byte	0
+ 445 0001 00       		.space	1
+ 446 0002 0000     		.short	0
+ 447 0004 11       		.byte	17
+ 448 0005 21       		.byte	33
+ 449 0006 00       		.byte	0
+ 450 0007 00       		.space	1
+ 451 0008 0000     		.short	0
+ 452 000a 12       		.byte	18
+ 453 000b 00       		.byte	0
+ 454 000c 00       		.byte	0
+ 455 000d 00       		.space	1
+ 456 000e 0000     		.short	0
+ 457 0010 13       		.byte	19
+ 458 0011 00       		.byte	0
+ 459 0012 00       		.byte	0
+ 460 0013 00       		.space	1
+ 461 0014 0000     		.short	0
+ 462 0016 14       		.byte	20
+ 463 0017 00       		.byte	0
+ 464              		.text
+ 465              	.Letext0:
+ 466              		.file 2 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\machine\\_default_types.h"
+ 467              		.file 3 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\sys\\_stdint.h"
+ 468              		.file 4 "User_App/app_key.h"
+ 469              		.file 5 "Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h"
+ 470              		.file 6 "Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f405xx.h"
+ 471              		.file 7 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_gpio.h"
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s 			page 13
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 app_key.c
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:20     .text.App_Key_Read:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:25     .text.App_Key_Read:00000000 App_Key_Read
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:44     .text.App_Key_Read:0000000a $d
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:48     .text.App_Key_Read:0000000e $t
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:104    .text.App_Key_Read:0000003c $d
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:109    .text.App_Key_Send:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:114    .text.App_Key_Send:00000000 App_Key_Send
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:158    .text.App_Key_Send:00000024 $d
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:163    .text.App_Key_UpdateOne:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:168    .text.App_Key_UpdateOne:00000000 App_Key_UpdateOne
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:190    .text.App_Key_UpdateOne:0000000e $d
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:194    .text.App_Key_UpdateOne:00000012 $t
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:323    .text.App_Key_Init:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:329    .text.App_Key_Init:00000000 App_Key_Init
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:370    .text.App_Key_Init:00000020 $d
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:375    .text.App_Key_Run:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:381    .text.App_Key_Run:00000000 App_Key_Run
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:434    .text.App_Key_Run:0000002c $d
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:439    .data.s_keys:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\ccmTz9pc.s:443    .data.s_keys:00000000 s_keys
+
+UNDEFINED SYMBOLS
+HAL_GPIO_ReadPin
+osMessageQueuePut
+Queue_CmdHandle
+osDelay

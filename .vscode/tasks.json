@@ -1,0 +1,17 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Flash to STM32",
+            "type": "shell",
+            "command": "openocd",
+            "args": [
+                "-f", "interface/stlink.cfg",
+                "-f", "target/stm32f4x.cfg",
+                "-c", "program build/1_vscode.elf verify reset exit"
+            ],
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}

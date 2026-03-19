@@ -1,0 +1,2937 @@
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 1
+
+
+   1              		.cpu cortex-m4
+   2              		.arch armv7e-m
+   3              		.fpu fpv4-sp-d16
+   4              		.eabi_attribute 27, 1
+   5              		.eabi_attribute 28, 1
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.file	"app_measure.c"
+  16              		.text
+  17              	.Ltext0:
+  18              		.cfi_sections	.debug_frame
+  19              		.section	.text.App_Measure_ResetStateMachine,"ax",%progbits
+  20              		.align	1
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	App_Measure_ResetStateMachine:
+  26              	.LFB243:
+  27              		.file 1 "User_App/app_measure.c"
+   1:User_App/app_measure.c **** ﻿#include "app_measure.h"
+   2:User_App/app_measure.c **** 
+   3:User_App/app_measure.c **** #include <math.h>
+   4:User_App/app_measure.c **** #include <string.h>
+   5:User_App/app_measure.c **** 
+   6:User_App/app_measure.c **** #include "adc.h"
+   7:User_App/app_measure.c **** #include "9834.h"
+   8:User_App/app_measure.c **** #include "bsp_afe.h"
+   9:User_App/app_measure.c **** #include "bsp_tim4.h"
+  10:User_App/app_measure.c **** #include "cmsis_os.h"
+  11:User_App/app_measure.c **** 
+  12:User_App/app_measure.c **** #define TASK_PERIOD_MS 10u
+  13:User_App/app_measure.c **** 
+  14:User_App/app_measure.c **** #define WAIT_V1_TICKS 30u
+  15:User_App/app_measure.c **** #define WAIT_V2_TICKS 30u
+  16:User_App/app_measure.c **** #define WAIT_V3_TICKS 30u
+  17:User_App/app_measure.c **** #define WAIT_I_TICKS  30u
+  18:User_App/app_measure.c **** 
+  19:User_App/app_measure.c **** #define RANGE_UP_THRESH 0.85f
+  20:User_App/app_measure.c **** #define RANGE_DOWN_THRESH 0.10f
+  21:User_App/app_measure.c **** 
+  22:User_App/app_measure.c **** #define ADC_FULL_SCALE 4095.0f
+  23:User_App/app_measure.c **** #define PI_F 3.14159265359f
+  24:User_App/app_measure.c **** 
+  25:User_App/app_measure.c **** #define VBAT_DIV_RATIO (110000.0f / (1000000.0f + 110000.0f))
+  26:User_App/app_measure.c **** #define ADC_VREF 3.3f
+  27:User_App/app_measure.c **** 
+  28:User_App/app_measure.c **** typedef enum {
+  29:User_App/app_measure.c ****     STATE_INIT = 0,
+  30:User_App/app_measure.c ****     STATE_SAMPLE_V1,
+  31:User_App/app_measure.c ****     STATE_SAMPLE_V2,
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 2
+
+
+  32:User_App/app_measure.c ****     STATE_SAMPLE_V3,
+  33:User_App/app_measure.c ****     STATE_SAMPLE_I,
+  34:User_App/app_measure.c ****     STATE_CALCULATE,
+  35:User_App/app_measure.c **** } MeasureState_t;
+  36:User_App/app_measure.c **** 
+  37:User_App/app_measure.c **** typedef struct {
+  38:User_App/app_measure.c ****     float y1;
+  39:User_App/app_measure.c ****     float y2;
+  40:User_App/app_measure.c ****     float alpha_slow;
+  41:User_App/app_measure.c ****     float alpha_fast;
+  42:User_App/app_measure.c ****     float threshold;
+  43:User_App/app_measure.c **** } DualAlphaFilter_t;
+  44:User_App/app_measure.c **** 
+  45:User_App/app_measure.c **** extern osMutexId_t Mutex_ResultHandle;
+  46:User_App/app_measure.c **** 
+  47:User_App/app_measure.c **** uint16_t g_adc1_dma_buf[ADC_DMA_BUF_LEN];
+  48:User_App/app_measure.c **** 
+  49:User_App/app_measure.c **** static MeasureState_t s_state = STATE_INIT;
+  50:User_App/app_measure.c **** static uint32_t s_wait_ticks = 0u;
+  51:User_App/app_measure.c **** 
+  52:User_App/app_measure.c **** static float s_iq_data[4];
+  53:User_App/app_measure.c **** static DualAlphaFilter_t s_filter[4];
+  54:User_App/app_measure.c **** 
+  55:User_App/app_measure.c **** static MeasureResult_t s_result;
+  56:User_App/app_measure.c **** static uint32_t s_freq_hz = 1000u;
+  57:User_App/app_measure.c **** static uint8_t s_adc_dma_ok = 0u;
+  58:User_App/app_measure.c **** 
+  59:User_App/app_measure.c **** static void App_Measure_ResetStateMachine(void)
+  60:User_App/app_measure.c **** {
+  28              		.loc 1 60 1 view -0
+  29              		.cfi_startproc
+  30              		@ args = 0, pretend = 0, frame = 0
+  31              		@ frame_needed = 0, uses_anonymous_args = 0
+  32              		@ link register save eliminated.
+  61:User_App/app_measure.c ****     s_state = STATE_INIT;
+  33              		.loc 1 61 5 view .LVU1
+  34              		.loc 1 61 13 is_stmt 0 view .LVU2
+  35 0000 0023     		movs	r3, #0
+  36 0002 024A     		ldr	r2, .L2
+  37 0004 1370     		strb	r3, [r2]
+  62:User_App/app_measure.c ****     s_wait_ticks = 0u;
+  38              		.loc 1 62 5 is_stmt 1 view .LVU3
+  39              		.loc 1 62 18 is_stmt 0 view .LVU4
+  40 0006 024A     		ldr	r2, .L2+4
+  41 0008 1360     		str	r3, [r2]
+  63:User_App/app_measure.c **** }
+  42              		.loc 1 63 1 view .LVU5
+  43 000a 7047     		bx	lr
+  44              	.L3:
+  45              		.align	2
+  46              	.L2:
+  47 000c 00000000 		.word	.LANCHOR0
+  48 0010 00000000 		.word	.LANCHOR1
+  49              		.cfi_endproc
+  50              	.LFE243:
+  52              		.section	.text.App_Measure_FilterInit,"ax",%progbits
+  53              		.align	1
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 3
+
+
+  54              		.syntax unified
+  55              		.thumb
+  56              		.thumb_func
+  58              	App_Measure_FilterInit:
+  59              	.LVL0:
+  60              	.LFB244:
+  64:User_App/app_measure.c **** 
+  65:User_App/app_measure.c **** static void App_Measure_FilterInit(DualAlphaFilter_t *f, float alpha_slow, float alpha_fast, float 
+  66:User_App/app_measure.c **** {
+  61              		.loc 1 66 1 is_stmt 1 view -0
+  62              		.cfi_startproc
+  63              		@ args = 0, pretend = 0, frame = 0
+  64              		@ frame_needed = 0, uses_anonymous_args = 0
+  65              		@ link register save eliminated.
+  67:User_App/app_measure.c ****     f->y1 = 0.0f;
+  66              		.loc 1 67 5 view .LVU7
+  67              		.loc 1 67 11 is_stmt 0 view .LVU8
+  68 0000 0023     		movs	r3, #0
+  69 0002 0360     		str	r3, [r0]	@ float
+  68:User_App/app_measure.c ****     f->y2 = 0.0f;
+  70              		.loc 1 68 5 is_stmt 1 view .LVU9
+  71              		.loc 1 68 11 is_stmt 0 view .LVU10
+  72 0004 4360     		str	r3, [r0, #4]	@ float
+  69:User_App/app_measure.c ****     f->alpha_slow = alpha_slow;
+  73              		.loc 1 69 5 is_stmt 1 view .LVU11
+  74              		.loc 1 69 19 is_stmt 0 view .LVU12
+  75 0006 80ED020A 		vstr.32	s0, [r0, #8]
+  70:User_App/app_measure.c ****     f->alpha_fast = alpha_fast;
+  76              		.loc 1 70 5 is_stmt 1 view .LVU13
+  77              		.loc 1 70 19 is_stmt 0 view .LVU14
+  78 000a C0ED030A 		vstr.32	s1, [r0, #12]
+  71:User_App/app_measure.c ****     f->threshold = threshold;
+  79              		.loc 1 71 5 is_stmt 1 view .LVU15
+  80              		.loc 1 71 18 is_stmt 0 view .LVU16
+  81 000e 80ED041A 		vstr.32	s2, [r0, #16]
+  72:User_App/app_measure.c **** }
+  82              		.loc 1 72 1 view .LVU17
+  83 0012 7047     		bx	lr
+  84              		.cfi_endproc
+  85              	.LFE244:
+  87              		.section	.text.App_Measure_FilterUpdate,"ax",%progbits
+  88              		.align	1
+  89              		.syntax unified
+  90              		.thumb
+  91              		.thumb_func
+  93              	App_Measure_FilterUpdate:
+  94              	.LVL1:
+  95              	.LFB245:
+  73:User_App/app_measure.c **** 
+  74:User_App/app_measure.c **** static float App_Measure_FilterUpdate(DualAlphaFilter_t *f, float raw)
+  75:User_App/app_measure.c **** {
+  96              		.loc 1 75 1 is_stmt 1 view -0
+  97              		.cfi_startproc
+  98              		@ args = 0, pretend = 0, frame = 0
+  99              		@ frame_needed = 0, uses_anonymous_args = 0
+ 100              		@ link register save eliminated.
+  76:User_App/app_measure.c ****     float alpha = f->alpha_slow;
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 4
+
+
+ 101              		.loc 1 76 5 view .LVU19
+ 102              		.loc 1 76 11 is_stmt 0 view .LVU20
+ 103 0000 90ED027A 		vldr.32	s14, [r0, #8]
+ 104              	.LVL2:
+  77:User_App/app_measure.c **** 
+  78:User_App/app_measure.c ****     if (fabsf(raw - f->y1) > f->threshold) {
+ 105              		.loc 1 78 5 is_stmt 1 view .LVU21
+ 106              		.loc 1 78 22 is_stmt 0 view .LVU22
+ 107 0004 D0ED007A 		vldr.32	s15, [r0]
+ 108              		.loc 1 78 19 view .LVU23
+ 109 0008 30EE670A 		vsub.f32	s0, s0, s15
+ 110              	.LVL3:
+ 111              		.loc 1 78 9 view .LVU24
+ 112 000c B0EEC06A 		vabs.f32	s12, s0
+ 113              		.loc 1 78 31 view .LVU25
+ 114 0010 D0ED046A 		vldr.32	s13, [r0, #16]
+ 115              		.loc 1 78 8 view .LVU26
+ 116 0014 B4EEE66A 		vcmpe.f32	s12, s13
+ 117 0018 F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 118 001c 01DD     		ble	.L6
+  79:User_App/app_measure.c ****         alpha = f->alpha_fast;
+ 119              		.loc 1 79 9 is_stmt 1 view .LVU27
+ 120              		.loc 1 79 15 is_stmt 0 view .LVU28
+ 121 001e 90ED037A 		vldr.32	s14, [r0, #12]
+ 122              	.LVL4:
+ 123              	.L6:
+  80:User_App/app_measure.c ****     }
+  81:User_App/app_measure.c **** 
+  82:User_App/app_measure.c ****     f->y1 += alpha * (raw - f->y1);
+ 124              		.loc 1 82 5 is_stmt 1 view .LVU29
+ 125              		.loc 1 82 20 is_stmt 0 view .LVU30
+ 126 0022 20EE070A 		vmul.f32	s0, s0, s14
+ 127              		.loc 1 82 11 view .LVU31
+ 128 0026 77EE807A 		vadd.f32	s15, s15, s0
+ 129 002a C0ED007A 		vstr.32	s15, [r0]
+  83:User_App/app_measure.c ****     f->y2 += alpha * (f->y1 - f->y2);
+ 130              		.loc 1 83 5 is_stmt 1 view .LVU32
+ 131              		.loc 1 83 11 is_stmt 0 view .LVU33
+ 132 002e 90ED010A 		vldr.32	s0, [r0, #4]
+ 133              		.loc 1 83 29 view .LVU34
+ 134 0032 77EEC07A 		vsub.f32	s15, s15, s0
+ 135              		.loc 1 83 20 view .LVU35
+ 136 0036 67EE877A 		vmul.f32	s15, s15, s14
+ 137              		.loc 1 83 11 view .LVU36
+ 138 003a 30EE270A 		vadd.f32	s0, s0, s15
+ 139 003e 80ED010A 		vstr.32	s0, [r0, #4]
+  84:User_App/app_measure.c **** 
+  85:User_App/app_measure.c ****     return f->y2;
+ 140              		.loc 1 85 5 is_stmt 1 view .LVU37
+  86:User_App/app_measure.c **** }
+ 141              		.loc 1 86 1 is_stmt 0 view .LVU38
+ 142 0042 7047     		bx	lr
+ 143              		.cfi_endproc
+ 144              	.LFE245:
+ 146              		.section	.text.App_Measure_FilterResetAll,"ax",%progbits
+ 147              		.align	1
+ 148              		.syntax unified
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 5
+
+
+ 149              		.thumb
+ 150              		.thumb_func
+ 152              	App_Measure_FilterResetAll:
+ 153              	.LVL5:
+ 154              	.LFB246:
+  87:User_App/app_measure.c **** 
+  88:User_App/app_measure.c **** static void App_Measure_FilterResetAll(float value)
+  89:User_App/app_measure.c **** {
+ 155              		.loc 1 89 1 is_stmt 1 view -0
+ 156              		.cfi_startproc
+ 157              		@ args = 0, pretend = 0, frame = 0
+ 158              		@ frame_needed = 0, uses_anonymous_args = 0
+ 159              		@ link register save eliminated.
+  90:User_App/app_measure.c ****     uint32_t i;
+ 160              		.loc 1 90 5 view .LVU40
+  91:User_App/app_measure.c **** 
+  92:User_App/app_measure.c ****     for (i = 0u; i < 4u; i++) {
+ 161              		.loc 1 92 5 view .LVU41
+ 162              		.loc 1 92 12 is_stmt 0 view .LVU42
+ 163 0000 0023     		movs	r3, #0
+ 164              		.loc 1 92 5 view .LVU43
+ 165 0002 09E0     		b	.L10
+ 166              	.LVL6:
+ 167              	.L11:
+  93:User_App/app_measure.c ****         s_filter[i].y1 = value;
+ 168              		.loc 1 93 9 is_stmt 1 discriminator 3 view .LVU44
+ 169              		.loc 1 93 24 is_stmt 0 discriminator 3 view .LVU45
+ 170 0004 03EB8301 		add	r1, r3, r3, lsl #2
+ 171 0008 054A     		ldr	r2, .L12
+ 172 000a 02EB8102 		add	r2, r2, r1, lsl #2
+ 173 000e 82ED000A 		vstr.32	s0, [r2]
+  94:User_App/app_measure.c ****         s_filter[i].y2 = value;
+ 174              		.loc 1 94 9 is_stmt 1 discriminator 3 view .LVU46
+ 175              		.loc 1 94 24 is_stmt 0 discriminator 3 view .LVU47
+ 176 0012 82ED010A 		vstr.32	s0, [r2, #4]
+  92:User_App/app_measure.c ****         s_filter[i].y1 = value;
+ 177              		.loc 1 92 26 is_stmt 1 discriminator 3 view .LVU48
+  92:User_App/app_measure.c ****         s_filter[i].y1 = value;
+ 178              		.loc 1 92 27 is_stmt 0 discriminator 3 view .LVU49
+ 179 0016 0133     		adds	r3, r3, #1
+ 180              	.LVL7:
+ 181              	.L10:
+  92:User_App/app_measure.c ****         s_filter[i].y1 = value;
+ 182              		.loc 1 92 18 is_stmt 1 discriminator 1 view .LVU50
+  92:User_App/app_measure.c ****         s_filter[i].y1 = value;
+ 183              		.loc 1 92 5 is_stmt 0 discriminator 1 view .LVU51
+ 184 0018 032B     		cmp	r3, #3
+ 185 001a F3D9     		bls	.L11
+  95:User_App/app_measure.c ****     }
+  96:User_App/app_measure.c **** }
+ 186              		.loc 1 96 1 view .LVU52
+ 187 001c 7047     		bx	lr
+ 188              	.L13:
+ 189 001e 00BF     		.align	2
+ 190              	.L12:
+ 191 0020 00000000 		.word	.LANCHOR2
+ 192              		.cfi_endproc
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 6
+
+
+ 193              	.LFE246:
+ 195              		.section	.text.App_Measure_NormalizeFreq,"ax",%progbits
+ 196              		.align	1
+ 197              		.syntax unified
+ 198              		.thumb
+ 199              		.thumb_func
+ 201              	App_Measure_NormalizeFreq:
+ 202              	.LVL8:
+ 203              	.LFB247:
+  97:User_App/app_measure.c **** 
+  98:User_App/app_measure.c **** static uint32_t App_Measure_NormalizeFreq(uint32_t freq_hz)
+  99:User_App/app_measure.c **** {
+ 204              		.loc 1 99 1 is_stmt 1 view -0
+ 205              		.cfi_startproc
+ 206              		@ args = 0, pretend = 0, frame = 0
+ 207              		@ frame_needed = 0, uses_anonymous_args = 0
+ 208              		.loc 1 99 1 is_stmt 0 view .LVU54
+ 209 0000 00B5     		push	{lr}
+ 210              	.LCFI0:
+ 211              		.cfi_def_cfa_offset 4
+ 212              		.cfi_offset 14, -4
+ 213 0002 0246     		mov	r2, r0
+ 100:User_App/app_measure.c ****     static const uint32_t kFreqList[] = {100u, 1000u, 10000u, 100000u};
+ 214              		.loc 1 100 5 is_stmt 1 view .LVU55
+ 101:User_App/app_measure.c ****     uint32_t best = kFreqList[0];
+ 215              		.loc 1 101 5 view .LVU56
+ 216              	.LVL9:
+ 102:User_App/app_measure.c ****     uint32_t best_diff = (freq_hz > best) ? (freq_hz - best) : (best - freq_hz);
+ 217              		.loc 1 102 5 view .LVU57
+ 218              		.loc 1 102 62 is_stmt 0 view .LVU58
+ 219 0004 6428     		cmp	r0, #100
+ 220 0006 04D9     		bls	.L15
+ 221              		.loc 1 102 62 discriminator 1 view .LVU59
+ 222 0008 A0F1640E 		sub	lr, r0, #100
+ 223              	.L17:
+ 224              	.LBB2:
+ 103:User_App/app_measure.c ****     uint32_t i;
+ 104:User_App/app_measure.c **** 
+ 105:User_App/app_measure.c ****     for (i = 1u; i < (sizeof(kFreqList) / sizeof(kFreqList[0])); i++) {
+ 106:User_App/app_measure.c ****         uint32_t candidate = kFreqList[i];
+ 107:User_App/app_measure.c ****         uint32_t diff = (freq_hz > candidate) ? (freq_hz - candidate) : (candidate - freq_hz);
+ 108:User_App/app_measure.c ****         if (diff < best_diff) {
+ 109:User_App/app_measure.c ****             best = candidate;
+ 225              		.loc 1 109 18 discriminator 1 view .LVU60
+ 226 000c 0123     		movs	r3, #1
+ 227 000e 6420     		movs	r0, #100
+ 228              	.LVL10:
+ 229              		.loc 1 109 18 discriminator 1 view .LVU61
+ 230 0010 09E0     		b	.L16
+ 231              	.LVL11:
+ 232              	.L15:
+ 233              		.loc 1 109 18 discriminator 1 view .LVU62
+ 234              	.LBE2:
+ 102:User_App/app_measure.c ****     uint32_t best_diff = (freq_hz > best) ? (freq_hz - best) : (best - freq_hz);
+ 235              		.loc 1 102 62 discriminator 2 view .LVU63
+ 236 0012 C0F1640E 		rsb	lr, r0, #100
+ 237 0016 F9E7     		b	.L17
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 7
+
+
+ 238              	.LVL12:
+ 239              	.L18:
+ 240              	.LBB3:
+ 107:User_App/app_measure.c ****         if (diff < best_diff) {
+ 241              		.loc 1 107 71 discriminator 2 view .LVU64
+ 242 0018 A1EB020C 		sub	ip, r1, r2
+ 243              	.L19:
+ 244              	.LVL13:
+ 108:User_App/app_measure.c ****             best = candidate;
+ 245              		.loc 1 108 9 is_stmt 1 discriminator 4 view .LVU65
+ 108:User_App/app_measure.c ****             best = candidate;
+ 246              		.loc 1 108 12 is_stmt 0 discriminator 4 view .LVU66
+ 247 001c E645     		cmp	lr, ip
+ 248 001e 01D9     		bls	.L20
+ 110:User_App/app_measure.c ****             best_diff = diff;
+ 249              		.loc 1 110 23 view .LVU67
+ 250 0020 E646     		mov	lr, ip
+ 251              	.LVL14:
+ 109:User_App/app_measure.c ****             best_diff = diff;
+ 252              		.loc 1 109 18 view .LVU68
+ 253 0022 0846     		mov	r0, r1
+ 254              	.LVL15:
+ 255              	.L20:
+ 109:User_App/app_measure.c ****             best_diff = diff;
+ 256              		.loc 1 109 18 view .LVU69
+ 257              	.LBE3:
+ 105:User_App/app_measure.c ****         uint32_t candidate = kFreqList[i];
+ 258              		.loc 1 105 66 is_stmt 1 discriminator 2 view .LVU70
+ 105:User_App/app_measure.c ****         uint32_t candidate = kFreqList[i];
+ 259              		.loc 1 105 67 is_stmt 0 discriminator 2 view .LVU71
+ 260 0024 0133     		adds	r3, r3, #1
+ 261              	.LVL16:
+ 262              	.L16:
+ 105:User_App/app_measure.c ****         uint32_t candidate = kFreqList[i];
+ 263              		.loc 1 105 18 is_stmt 1 discriminator 1 view .LVU72
+ 105:User_App/app_measure.c ****         uint32_t candidate = kFreqList[i];
+ 264              		.loc 1 105 5 is_stmt 0 discriminator 1 view .LVU73
+ 265 0026 032B     		cmp	r3, #3
+ 266 0028 07D8     		bhi	.L24
+ 267              	.LBB4:
+ 106:User_App/app_measure.c ****         uint32_t diff = (freq_hz > candidate) ? (freq_hz - candidate) : (candidate - freq_hz);
+ 268              		.loc 1 106 9 is_stmt 1 view .LVU74
+ 106:User_App/app_measure.c ****         uint32_t diff = (freq_hz > candidate) ? (freq_hz - candidate) : (candidate - freq_hz);
+ 269              		.loc 1 106 18 is_stmt 0 view .LVU75
+ 270 002a 0549     		ldr	r1, .L25
+ 271 002c 51F82310 		ldr	r1, [r1, r3, lsl #2]
+ 272              	.LVL17:
+ 107:User_App/app_measure.c ****         if (diff < best_diff) {
+ 273              		.loc 1 107 9 is_stmt 1 view .LVU76
+ 107:User_App/app_measure.c ****         if (diff < best_diff) {
+ 274              		.loc 1 107 71 is_stmt 0 view .LVU77
+ 275 0030 8A42     		cmp	r2, r1
+ 276 0032 F1D9     		bls	.L18
+ 107:User_App/app_measure.c ****         if (diff < best_diff) {
+ 277              		.loc 1 107 71 discriminator 1 view .LVU78
+ 278 0034 A2EB010C 		sub	ip, r2, r1
+ 279 0038 F0E7     		b	.L19
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 8
+
+
+ 280              	.LVL18:
+ 281              	.L24:
+ 107:User_App/app_measure.c ****         if (diff < best_diff) {
+ 282              		.loc 1 107 71 discriminator 1 view .LVU79
+ 283              	.LBE4:
+ 111:User_App/app_measure.c ****         }
+ 112:User_App/app_measure.c ****     }
+ 113:User_App/app_measure.c **** 
+ 114:User_App/app_measure.c ****     return best;
+ 284              		.loc 1 114 5 is_stmt 1 view .LVU80
+ 115:User_App/app_measure.c **** }
+ 285              		.loc 1 115 1 is_stmt 0 view .LVU81
+ 286 003a 5DF804FB 		ldr	pc, [sp], #4
+ 287              	.L26:
+ 288 003e 00BF     		.align	2
+ 289              	.L25:
+ 290 0040 00000000 		.word	.LANCHOR3
+ 291              		.cfi_endproc
+ 292              	.LFE247:
+ 294              		.section	.text.App_Measure_FreqToLpf,"ax",%progbits
+ 295              		.align	1
+ 296              		.syntax unified
+ 297              		.thumb
+ 298              		.thumb_func
+ 300              	App_Measure_FreqToLpf:
+ 301              	.LVL19:
+ 302              	.LFB248:
+ 116:User_App/app_measure.c **** 
+ 117:User_App/app_measure.c **** static AFE_LPF_Freq_t App_Measure_FreqToLpf(uint32_t freq_hz)
+ 118:User_App/app_measure.c **** {
+ 303              		.loc 1 118 1 is_stmt 1 view -0
+ 304              		.cfi_startproc
+ 305              		@ args = 0, pretend = 0, frame = 0
+ 306              		@ frame_needed = 0, uses_anonymous_args = 0
+ 307              		@ link register save eliminated.
+ 119:User_App/app_measure.c ****     if (freq_hz <= 100u) {
+ 308              		.loc 1 119 5 view .LVU83
+ 309              		.loc 1 119 8 is_stmt 0 view .LVU84
+ 310 0000 6428     		cmp	r0, #100
+ 311 0002 08D9     		bls	.L29
+ 120:User_App/app_measure.c ****         return LPF_100HZ;
+ 121:User_App/app_measure.c ****     }
+ 122:User_App/app_measure.c ****     if (freq_hz <= 1000u) {
+ 312              		.loc 1 122 5 is_stmt 1 view .LVU85
+ 313              		.loc 1 122 8 is_stmt 0 view .LVU86
+ 314 0004 B0F57A7F 		cmp	r0, #1000
+ 315 0008 07D9     		bls	.L30
+ 123:User_App/app_measure.c ****         return LPF_1KHZ;
+ 124:User_App/app_measure.c ****     }
+ 125:User_App/app_measure.c ****     if (freq_hz <= 10000u) {
+ 316              		.loc 1 125 5 is_stmt 1 view .LVU87
+ 317              		.loc 1 125 8 is_stmt 0 view .LVU88
+ 318 000a 42F21073 		movw	r3, #10000
+ 319 000e 9842     		cmp	r0, r3
+ 320 0010 05D9     		bls	.L31
+ 126:User_App/app_measure.c ****         return LPF_10KHZ;
+ 127:User_App/app_measure.c ****     }
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 9
+
+
+ 128:User_App/app_measure.c ****     return LPF_100KHZ;
+ 321              		.loc 1 128 12 view .LVU89
+ 322 0012 0320     		movs	r0, #3
+ 323              	.LVL20:
+ 324              		.loc 1 128 12 view .LVU90
+ 325 0014 7047     		bx	lr
+ 326              	.LVL21:
+ 327              	.L29:
+ 120:User_App/app_measure.c ****     }
+ 328              		.loc 1 120 16 view .LVU91
+ 329 0016 0020     		movs	r0, #0
+ 330              	.LVL22:
+ 120:User_App/app_measure.c ****     }
+ 331              		.loc 1 120 16 view .LVU92
+ 332 0018 7047     		bx	lr
+ 333              	.LVL23:
+ 334              	.L30:
+ 123:User_App/app_measure.c ****         return LPF_1KHZ;
+ 335              		.loc 1 123 16 view .LVU93
+ 336 001a 0120     		movs	r0, #1
+ 337              	.LVL24:
+ 123:User_App/app_measure.c ****         return LPF_1KHZ;
+ 338              		.loc 1 123 16 view .LVU94
+ 339 001c 7047     		bx	lr
+ 340              	.LVL25:
+ 341              	.L31:
+ 126:User_App/app_measure.c ****         return LPF_10KHZ;
+ 342              		.loc 1 126 16 view .LVU95
+ 343 001e 0220     		movs	r0, #2
+ 344              	.LVL26:
+ 129:User_App/app_measure.c **** }
+ 345              		.loc 1 129 1 view .LVU96
+ 346 0020 7047     		bx	lr
+ 347              		.cfi_endproc
+ 348              	.LFE248:
+ 350              		.section	.text.App_Measure_PrepareAdcDma,"ax",%progbits
+ 351              		.align	1
+ 352              		.syntax unified
+ 353              		.thumb
+ 354              		.thumb_func
+ 356              	App_Measure_PrepareAdcDma:
+ 357              	.LFB249:
+ 130:User_App/app_measure.c **** 
+ 131:User_App/app_measure.c **** static uint8_t App_Measure_PrepareAdcDma(void)
+ 132:User_App/app_measure.c **** {
+ 358              		.loc 1 132 1 is_stmt 1 view -0
+ 359              		.cfi_startproc
+ 360              		@ args = 0, pretend = 0, frame = 16
+ 361              		@ frame_needed = 0, uses_anonymous_args = 0
+ 362 0000 30B5     		push	{r4, r5, lr}
+ 363              	.LCFI1:
+ 364              		.cfi_def_cfa_offset 12
+ 365              		.cfi_offset 4, -12
+ 366              		.cfi_offset 5, -8
+ 367              		.cfi_offset 14, -4
+ 368 0002 85B0     		sub	sp, sp, #20
+ 369              	.LCFI2:
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 10
+
+
+ 370              		.cfi_def_cfa_offset 32
+ 133:User_App/app_measure.c ****     ADC_ChannelConfTypeDef sConfig;
+ 371              		.loc 1 133 5 view .LVU98
+ 134:User_App/app_measure.c **** 
+ 135:User_App/app_measure.c ****     (void)HAL_ADC_Stop_DMA(&hadc1);
+ 372              		.loc 1 135 5 view .LVU99
+ 373              		.loc 1 135 11 is_stmt 0 view .LVU100
+ 374 0004 1E4C     		ldr	r4, .L39
+ 375 0006 2046     		mov	r0, r4
+ 376 0008 FFF7FEFF 		bl	HAL_ADC_Stop_DMA
+ 377              	.LVL27:
+ 136:User_App/app_measure.c ****     (void)HAL_ADC_Stop(&hadc1);
+ 378              		.loc 1 136 5 is_stmt 1 view .LVU101
+ 379              		.loc 1 136 11 is_stmt 0 view .LVU102
+ 380 000c 2046     		mov	r0, r4
+ 381 000e FFF7FEFF 		bl	HAL_ADC_Stop
+ 382              	.LVL28:
+ 137:User_App/app_measure.c **** 
+ 138:User_App/app_measure.c ****     if (HAL_ADC_DeInit(&hadc1) != HAL_OK) {
+ 383              		.loc 1 138 5 is_stmt 1 view .LVU103
+ 384              		.loc 1 138 9 is_stmt 0 view .LVU104
+ 385 0012 2046     		mov	r0, r4
+ 386 0014 FFF7FEFF 		bl	HAL_ADC_DeInit
+ 387              	.LVL29:
+ 388              		.loc 1 138 8 view .LVU105
+ 389 0018 18B1     		cbz	r0, .L37
+ 139:User_App/app_measure.c ****         return 0u;
+ 390              		.loc 1 139 16 view .LVU106
+ 391 001a 0024     		movs	r4, #0
+ 392              	.L33:
+ 140:User_App/app_measure.c ****     }
+ 141:User_App/app_measure.c **** 
+ 142:User_App/app_measure.c ****     hadc1.Init.ContinuousConvMode = ENABLE;
+ 143:User_App/app_measure.c ****     hadc1.Init.DMAContinuousRequests = ENABLE;
+ 144:User_App/app_measure.c ****     hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+ 145:User_App/app_measure.c **** 
+ 146:User_App/app_measure.c ****     if (HAL_ADC_Init(&hadc1) != HAL_OK) {
+ 147:User_App/app_measure.c ****         return 0u;
+ 148:User_App/app_measure.c ****     }
+ 149:User_App/app_measure.c **** 
+ 150:User_App/app_measure.c ****     memset(&sConfig, 0, sizeof(sConfig));
+ 151:User_App/app_measure.c ****     sConfig.Channel = ADC_CHANNEL_3;
+ 152:User_App/app_measure.c ****     sConfig.Rank = 1;
+ 153:User_App/app_measure.c ****     sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+ 154:User_App/app_measure.c **** 
+ 155:User_App/app_measure.c ****     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+ 156:User_App/app_measure.c ****         return 0u;
+ 157:User_App/app_measure.c ****     }
+ 158:User_App/app_measure.c **** 
+ 159:User_App/app_measure.c ****     memset(g_adc1_dma_buf, 0, sizeof(g_adc1_dma_buf));
+ 160:User_App/app_measure.c **** 
+ 161:User_App/app_measure.c ****     if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)g_adc1_dma_buf, ADC_DMA_BUF_LEN) != HAL_OK) {
+ 162:User_App/app_measure.c ****         return 0u;
+ 163:User_App/app_measure.c ****     }
+ 164:User_App/app_measure.c **** 
+ 165:User_App/app_measure.c ****     return 1u;
+ 166:User_App/app_measure.c **** }
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 11
+
+
+ 393              		.loc 1 166 1 view .LVU107
+ 394 001c 2046     		mov	r0, r4
+ 395 001e 05B0     		add	sp, sp, #20
+ 396              	.LCFI3:
+ 397              		.cfi_remember_state
+ 398              		.cfi_def_cfa_offset 12
+ 399              		@ sp needed
+ 400 0020 30BD     		pop	{r4, r5, pc}
+ 401              	.L37:
+ 402              	.LCFI4:
+ 403              		.cfi_restore_state
+ 404 0022 0446     		mov	r4, r0
+ 142:User_App/app_measure.c ****     hadc1.Init.DMAContinuousRequests = ENABLE;
+ 405              		.loc 1 142 5 is_stmt 1 view .LVU108
+ 142:User_App/app_measure.c ****     hadc1.Init.DMAContinuousRequests = ENABLE;
+ 406              		.loc 1 142 35 is_stmt 0 view .LVU109
+ 407 0024 1648     		ldr	r0, .L39
+ 408 0026 0123     		movs	r3, #1
+ 409 0028 0376     		strb	r3, [r0, #24]
+ 143:User_App/app_measure.c ****     hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+ 410              		.loc 1 143 5 is_stmt 1 view .LVU110
+ 143:User_App/app_measure.c ****     hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+ 411              		.loc 1 143 38 is_stmt 0 view .LVU111
+ 412 002a 80F83030 		strb	r3, [r0, #48]
+ 144:User_App/app_measure.c **** 
+ 413              		.loc 1 144 5 is_stmt 1 view .LVU112
+ 144:User_App/app_measure.c **** 
+ 414              		.loc 1 144 29 is_stmt 0 view .LVU113
+ 415 002e 4361     		str	r3, [r0, #20]
+ 146:User_App/app_measure.c ****         return 0u;
+ 416              		.loc 1 146 5 is_stmt 1 view .LVU114
+ 146:User_App/app_measure.c ****         return 0u;
+ 417              		.loc 1 146 9 is_stmt 0 view .LVU115
+ 418 0030 FFF7FEFF 		bl	HAL_ADC_Init
+ 419              	.LVL30:
+ 146:User_App/app_measure.c ****         return 0u;
+ 420              		.loc 1 146 8 view .LVU116
+ 421 0034 0546     		mov	r5, r0
+ 422 0036 0028     		cmp	r0, #0
+ 423 0038 F0D1     		bne	.L33
+ 150:User_App/app_measure.c ****     sConfig.Channel = ADC_CHANNEL_3;
+ 424              		.loc 1 150 5 is_stmt 1 view .LVU117
+ 425 003a 0023     		movs	r3, #0
+ 426 003c 0093     		str	r3, [sp]
+ 427 003e 0193     		str	r3, [sp, #4]
+ 428 0040 0293     		str	r3, [sp, #8]
+ 429 0042 0393     		str	r3, [sp, #12]
+ 151:User_App/app_measure.c ****     sConfig.Rank = 1;
+ 430              		.loc 1 151 5 view .LVU118
+ 151:User_App/app_measure.c ****     sConfig.Rank = 1;
+ 431              		.loc 1 151 21 is_stmt 0 view .LVU119
+ 432 0044 0323     		movs	r3, #3
+ 433 0046 0093     		str	r3, [sp]
+ 152:User_App/app_measure.c ****     sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+ 434              		.loc 1 152 5 is_stmt 1 view .LVU120
+ 152:User_App/app_measure.c ****     sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+ 435              		.loc 1 152 18 is_stmt 0 view .LVU121
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 12
+
+
+ 436 0048 0123     		movs	r3, #1
+ 437 004a 0193     		str	r3, [sp, #4]
+ 153:User_App/app_measure.c **** 
+ 438              		.loc 1 153 5 is_stmt 1 view .LVU122
+ 153:User_App/app_measure.c **** 
+ 439              		.loc 1 153 26 is_stmt 0 view .LVU123
+ 440 004c 0723     		movs	r3, #7
+ 441 004e 0293     		str	r3, [sp, #8]
+ 155:User_App/app_measure.c ****         return 0u;
+ 442              		.loc 1 155 5 is_stmt 1 view .LVU124
+ 155:User_App/app_measure.c ****         return 0u;
+ 443              		.loc 1 155 9 is_stmt 0 view .LVU125
+ 444 0050 6946     		mov	r1, sp
+ 445 0052 0B48     		ldr	r0, .L39
+ 446 0054 FFF7FEFF 		bl	HAL_ADC_ConfigChannel
+ 447              	.LVL31:
+ 155:User_App/app_measure.c ****         return 0u;
+ 448              		.loc 1 155 8 view .LVU126
+ 449 0058 0446     		mov	r4, r0
+ 450 005a 08B1     		cbz	r0, .L38
+ 156:User_App/app_measure.c ****     }
+ 451              		.loc 1 156 16 view .LVU127
+ 452 005c 2C46     		mov	r4, r5
+ 453 005e DDE7     		b	.L33
+ 454              	.L38:
+ 159:User_App/app_measure.c **** 
+ 455              		.loc 1 159 5 is_stmt 1 view .LVU128
+ 456 0060 084D     		ldr	r5, .L39+4
+ 457 0062 2022     		movs	r2, #32
+ 458 0064 0021     		movs	r1, #0
+ 459 0066 2846     		mov	r0, r5
+ 460 0068 FFF7FEFF 		bl	memset
+ 461              	.LVL32:
+ 161:User_App/app_measure.c ****         return 0u;
+ 462              		.loc 1 161 5 view .LVU129
+ 161:User_App/app_measure.c ****         return 0u;
+ 463              		.loc 1 161 9 is_stmt 0 view .LVU130
+ 464 006c 1022     		movs	r2, #16
+ 465 006e 2946     		mov	r1, r5
+ 466 0070 0348     		ldr	r0, .L39
+ 467 0072 FFF7FEFF 		bl	HAL_ADC_Start_DMA
+ 468              	.LVL33:
+ 161:User_App/app_measure.c ****         return 0u;
+ 469              		.loc 1 161 8 view .LVU131
+ 470 0076 0028     		cmp	r0, #0
+ 471 0078 D0D1     		bne	.L33
+ 165:User_App/app_measure.c **** }
+ 472              		.loc 1 165 12 view .LVU132
+ 473 007a 0124     		movs	r4, #1
+ 474 007c CEE7     		b	.L33
+ 475              	.L40:
+ 476 007e 00BF     		.align	2
+ 477              	.L39:
+ 478 0080 00000000 		.word	hadc1
+ 479 0084 00000000 		.word	.LANCHOR4
+ 480              		.cfi_endproc
+ 481              	.LFE249:
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 13
+
+
+ 483              		.section	.text.App_Measure_ReadAdcPolling,"ax",%progbits
+ 484              		.align	1
+ 485              		.syntax unified
+ 486              		.thumb
+ 487              		.thumb_func
+ 489              	App_Measure_ReadAdcPolling:
+ 490              	.LFB250:
+ 167:User_App/app_measure.c **** 
+ 168:User_App/app_measure.c **** static float App_Measure_ReadAdcPolling(void)
+ 169:User_App/app_measure.c **** {
+ 491              		.loc 1 169 1 is_stmt 1 view -0
+ 492              		.cfi_startproc
+ 493              		@ args = 0, pretend = 0, frame = 0
+ 494              		@ frame_needed = 0, uses_anonymous_args = 0
+ 495 0000 08B5     		push	{r3, lr}
+ 496              	.LCFI5:
+ 497              		.cfi_def_cfa_offset 8
+ 498              		.cfi_offset 3, -8
+ 499              		.cfi_offset 14, -4
+ 500 0002 2DED028B 		vpush.64	{d8}
+ 501              	.LCFI6:
+ 502              		.cfi_def_cfa_offset 16
+ 503              		.cfi_offset 80, -16
+ 504              		.cfi_offset 81, -12
+ 170:User_App/app_measure.c ****     float norm = 0.0f;
+ 505              		.loc 1 170 5 view .LVU134
+ 506              	.LVL34:
+ 171:User_App/app_measure.c **** 
+ 172:User_App/app_measure.c ****     if (HAL_ADC_Start(&hadc1) == HAL_OK) {
+ 507              		.loc 1 172 5 view .LVU135
+ 508              		.loc 1 172 9 is_stmt 0 view .LVU136
+ 509 0006 1448     		ldr	r0, .L49
+ 510 0008 FFF7FEFF 		bl	HAL_ADC_Start
+ 511              	.LVL35:
+ 512              		.loc 1 172 8 view .LVU137
+ 513 000c 30B1     		cbz	r0, .L47
+ 170:User_App/app_measure.c ****     float norm = 0.0f;
+ 514              		.loc 1 170 11 view .LVU138
+ 515 000e 9FED138A 		vldr.32	s16, .L49+4
+ 173:User_App/app_measure.c ****         if (HAL_ADC_PollForConversion(&hadc1, 3u) == HAL_OK) {
+ 174:User_App/app_measure.c ****             uint16_t raw = (uint16_t)HAL_ADC_GetValue(&hadc1);
+ 175:User_App/app_measure.c ****             norm = ((float)raw / ADC_FULL_SCALE) * 2.0f - 1.0f;
+ 176:User_App/app_measure.c ****         }
+ 177:User_App/app_measure.c ****         (void)HAL_ADC_Stop(&hadc1);
+ 178:User_App/app_measure.c ****     }
+ 179:User_App/app_measure.c **** 
+ 180:User_App/app_measure.c ****     return norm;
+ 516              		.loc 1 180 5 is_stmt 1 view .LVU139
+ 517              	.LVL36:
+ 518              	.L41:
+ 181:User_App/app_measure.c **** }
+ 519              		.loc 1 181 1 is_stmt 0 view .LVU140
+ 520 0012 B0EE480A 		vmov.f32	s0, s16
+ 521 0016 BDEC028B 		vldm	sp!, {d8}
+ 522              	.LCFI7:
+ 523              		.cfi_remember_state
+ 524              		.cfi_restore 80
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 14
+
+
+ 525              		.cfi_restore 81
+ 526              		.cfi_def_cfa_offset 8
+ 527 001a 08BD     		pop	{r3, pc}
+ 528              	.LVL37:
+ 529              	.L47:
+ 530              	.LCFI8:
+ 531              		.cfi_restore_state
+ 173:User_App/app_measure.c ****         if (HAL_ADC_PollForConversion(&hadc1, 3u) == HAL_OK) {
+ 532              		.loc 1 173 9 is_stmt 1 view .LVU141
+ 173:User_App/app_measure.c ****         if (HAL_ADC_PollForConversion(&hadc1, 3u) == HAL_OK) {
+ 533              		.loc 1 173 13 is_stmt 0 view .LVU142
+ 534 001c 0321     		movs	r1, #3
+ 535 001e 0E48     		ldr	r0, .L49
+ 536 0020 FFF7FEFF 		bl	HAL_ADC_PollForConversion
+ 537              	.LVL38:
+ 173:User_App/app_measure.c ****         if (HAL_ADC_PollForConversion(&hadc1, 3u) == HAL_OK) {
+ 538              		.loc 1 173 12 view .LVU143
+ 539 0024 28B1     		cbz	r0, .L48
+ 170:User_App/app_measure.c **** 
+ 540              		.loc 1 170 11 view .LVU144
+ 541 0026 9FED0D8A 		vldr.32	s16, .L49+4
+ 542              	.LVL39:
+ 543              	.L43:
+ 177:User_App/app_measure.c ****     }
+ 544              		.loc 1 177 9 is_stmt 1 view .LVU145
+ 177:User_App/app_measure.c ****     }
+ 545              		.loc 1 177 15 is_stmt 0 view .LVU146
+ 546 002a 0B48     		ldr	r0, .L49
+ 547 002c FFF7FEFF 		bl	HAL_ADC_Stop
+ 548              	.LVL40:
+ 549 0030 EFE7     		b	.L41
+ 550              	.LVL41:
+ 551              	.L48:
+ 552              	.LBB5:
+ 174:User_App/app_measure.c ****             norm = ((float)raw / ADC_FULL_SCALE) * 2.0f - 1.0f;
+ 553              		.loc 1 174 13 is_stmt 1 view .LVU147
+ 174:User_App/app_measure.c ****             norm = ((float)raw / ADC_FULL_SCALE) * 2.0f - 1.0f;
+ 554              		.loc 1 174 38 is_stmt 0 view .LVU148
+ 555 0032 0948     		ldr	r0, .L49
+ 556 0034 FFF7FEFF 		bl	HAL_ADC_GetValue
+ 557              	.LVL42:
+ 174:User_App/app_measure.c ****             norm = ((float)raw / ADC_FULL_SCALE) * 2.0f - 1.0f;
+ 558              		.loc 1 174 22 view .LVU149
+ 559 0038 80B2     		uxth	r0, r0
+ 560              	.LVL43:
+ 175:User_App/app_measure.c ****         }
+ 561              		.loc 1 175 13 is_stmt 1 view .LVU150
+ 175:User_App/app_measure.c ****         }
+ 562              		.loc 1 175 21 is_stmt 0 view .LVU151
+ 563 003a 07EE900A 		vmov	s15, r0	@ int
+ 564 003e F8EE677A 		vcvt.f32.u32	s15, s15
+ 175:User_App/app_measure.c ****         }
+ 565              		.loc 1 175 32 view .LVU152
+ 566 0042 9FED077A 		vldr.32	s14, .L49+8
+ 567 0046 87EE878A 		vdiv.f32	s16, s15, s14
+ 175:User_App/app_measure.c ****         }
+ 568              		.loc 1 175 50 view .LVU153
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 15
+
+
+ 569 004a 38EE088A 		vadd.f32	s16, s16, s16
+ 175:User_App/app_measure.c ****         }
+ 570              		.loc 1 175 18 view .LVU154
+ 571 004e F7EE007A 		vmov.f32	s15, #1.0e+0
+ 572 0052 38EE678A 		vsub.f32	s16, s16, s15
+ 573              	.LVL44:
+ 175:User_App/app_measure.c ****         }
+ 574              		.loc 1 175 18 view .LVU155
+ 575 0056 E8E7     		b	.L43
+ 576              	.L50:
+ 577              		.align	2
+ 578              	.L49:
+ 579 0058 00000000 		.word	hadc1
+ 580 005c 00000000 		.word	0
+ 581 0060 00F07F45 		.word	1166012416
+ 582              	.LBE5:
+ 583              		.cfi_endproc
+ 584              	.LFE250:
+ 586              		.section	.text.App_Measure_AdcSample,"ax",%progbits
+ 587              		.align	1
+ 588              		.syntax unified
+ 589              		.thumb
+ 590              		.thumb_func
+ 592              	App_Measure_AdcSample:
+ 593              	.LFB251:
+ 182:User_App/app_measure.c **** 
+ 183:User_App/app_measure.c **** static float App_Measure_AdcSample(void)
+ 184:User_App/app_measure.c **** {
+ 594              		.loc 1 184 1 is_stmt 1 view -0
+ 595              		.cfi_startproc
+ 596              		@ args = 0, pretend = 0, frame = 0
+ 597              		@ frame_needed = 0, uses_anonymous_args = 0
+ 598 0000 08B5     		push	{r3, lr}
+ 599              	.LCFI9:
+ 600              		.cfi_def_cfa_offset 8
+ 601              		.cfi_offset 3, -8
+ 602              		.cfi_offset 14, -4
+ 185:User_App/app_measure.c ****     if (s_adc_dma_ok != 0u) {
+ 603              		.loc 1 185 5 view .LVU157
+ 604              		.loc 1 185 22 is_stmt 0 view .LVU158
+ 605 0002 114B     		ldr	r3, .L60
+ 606 0004 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 607              		.loc 1 185 8 view .LVU159
+ 608 0006 E3B1     		cbz	r3, .L59
+ 609              	.LBB6:
+ 186:User_App/app_measure.c ****         uint32_t i;
+ 187:User_App/app_measure.c ****         uint32_t sum = 0u;
+ 610              		.loc 1 187 18 view .LVU160
+ 611 0008 0022     		movs	r2, #0
+ 188:User_App/app_measure.c **** 
+ 189:User_App/app_measure.c ****         for (i = 0u; i < ADC_DMA_BUF_LEN; i++) {
+ 612              		.loc 1 189 16 view .LVU161
+ 613 000a 1346     		mov	r3, r2
+ 614 000c 04E0     		b	.L52
+ 615              	.LVL45:
+ 616              	.L54:
+ 190:User_App/app_measure.c ****             sum += g_adc1_dma_buf[i];
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 16
+
+
+ 617              		.loc 1 190 13 is_stmt 1 discriminator 3 view .LVU162
+ 618              		.loc 1 190 34 is_stmt 0 discriminator 3 view .LVU163
+ 619 000e 0F49     		ldr	r1, .L60+4
+ 620 0010 31F81310 		ldrh	r1, [r1, r3, lsl #1]
+ 621              		.loc 1 190 17 discriminator 3 view .LVU164
+ 622 0014 0A44     		add	r2, r2, r1
+ 623              	.LVL46:
+ 189:User_App/app_measure.c ****             sum += g_adc1_dma_buf[i];
+ 624              		.loc 1 189 43 is_stmt 1 discriminator 3 view .LVU165
+ 189:User_App/app_measure.c ****             sum += g_adc1_dma_buf[i];
+ 625              		.loc 1 189 44 is_stmt 0 discriminator 3 view .LVU166
+ 626 0016 0133     		adds	r3, r3, #1
+ 627              	.LVL47:
+ 628              	.L52:
+ 189:User_App/app_measure.c ****             sum += g_adc1_dma_buf[i];
+ 629              		.loc 1 189 22 is_stmt 1 discriminator 1 view .LVU167
+ 189:User_App/app_measure.c ****             sum += g_adc1_dma_buf[i];
+ 630              		.loc 1 189 9 is_stmt 0 discriminator 1 view .LVU168
+ 631 0018 0F2B     		cmp	r3, #15
+ 632 001a F8D9     		bls	.L54
+ 191:User_App/app_measure.c ****         }
+ 192:User_App/app_measure.c **** 
+ 193:User_App/app_measure.c ****         return (((float)sum / (float)ADC_DMA_BUF_LEN) / ADC_FULL_SCALE) * 2.0f - 1.0f;
+ 633              		.loc 1 193 9 is_stmt 1 view .LVU169
+ 634              		.loc 1 193 18 is_stmt 0 view .LVU170
+ 635 001c 07EE902A 		vmov	s15, r2	@ int
+ 636 0020 F8EE677A 		vcvt.f32.u32	s15, s15
+ 637              		.loc 1 193 29 view .LVU171
+ 638 0024 9FED0A7A 		vldr.32	s14, .L60+8
+ 639 0028 67EE877A 		vmul.f32	s15, s15, s14
+ 640              		.loc 1 193 55 view .LVU172
+ 641 002c 9FED097A 		vldr.32	s14, .L60+12
+ 642 0030 87EE870A 		vdiv.f32	s0, s15, s14
+ 643              		.loc 1 193 73 view .LVU173
+ 644 0034 30EE000A 		vadd.f32	s0, s0, s0
+ 645              		.loc 1 193 80 view .LVU174
+ 646 0038 F7EE007A 		vmov.f32	s15, #1.0e+0
+ 647 003c 30EE670A 		vsub.f32	s0, s0, s15
+ 648              	.LVL48:
+ 649              	.L51:
+ 650              		.loc 1 193 80 view .LVU175
+ 651              	.LBE6:
+ 194:User_App/app_measure.c ****     }
+ 195:User_App/app_measure.c **** 
+ 196:User_App/app_measure.c ****     return App_Measure_ReadAdcPolling();
+ 197:User_App/app_measure.c **** }
+ 652              		.loc 1 197 1 view .LVU176
+ 653 0040 08BD     		pop	{r3, pc}
+ 654              	.L59:
+ 196:User_App/app_measure.c **** }
+ 655              		.loc 1 196 5 is_stmt 1 view .LVU177
+ 196:User_App/app_measure.c **** }
+ 656              		.loc 1 196 12 is_stmt 0 view .LVU178
+ 657 0042 FFF7FEFF 		bl	App_Measure_ReadAdcPolling
+ 658              	.LVL49:
+ 659 0046 FBE7     		b	.L51
+ 660              	.L61:
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 17
+
+
+ 661              		.align	2
+ 662              	.L60:
+ 663 0048 00000000 		.word	.LANCHOR5
+ 664 004c 00000000 		.word	.LANCHOR4
+ 665 0050 0000803D 		.word	1031798784
+ 666 0054 00F07F45 		.word	1166012416
+ 667              		.cfi_endproc
+ 668              	.LFE251:
+ 670              		.section	.text.App_Measure_AutoRange,"ax",%progbits
+ 671              		.align	1
+ 672              		.syntax unified
+ 673              		.thumb
+ 674              		.thumb_func
+ 676              	App_Measure_AutoRange:
+ 677              	.LFB252:
+ 198:User_App/app_measure.c **** 
+ 199:User_App/app_measure.c **** static uint8_t App_Measure_AutoRange(void)
+ 200:User_App/app_measure.c **** {
+ 678              		.loc 1 200 1 is_stmt 1 view -0
+ 679              		.cfi_startproc
+ 680              		@ args = 0, pretend = 0, frame = 0
+ 681              		@ frame_needed = 0, uses_anonymous_args = 0
+ 682 0000 10B5     		push	{r4, lr}
+ 683              	.LCFI10:
+ 684              		.cfi_def_cfa_offset 8
+ 685              		.cfi_offset 4, -8
+ 686              		.cfi_offset 14, -4
+ 201:User_App/app_measure.c ****     float max_abs = 0.0f;
+ 687              		.loc 1 201 5 view .LVU180
+ 688              	.LVL50:
+ 202:User_App/app_measure.c ****     uint32_t i;
+ 689              		.loc 1 202 5 view .LVU181
+ 203:User_App/app_measure.c ****     uint8_t changed = 0u;
+ 690              		.loc 1 203 5 view .LVU182
+ 204:User_App/app_measure.c **** 
+ 205:User_App/app_measure.c ****     AFE_Rref_t rref = BSP_AFE_GetRref();
+ 691              		.loc 1 205 5 view .LVU183
+ 692              		.loc 1 205 23 is_stmt 0 view .LVU184
+ 693 0002 FFF7FEFF 		bl	BSP_AFE_GetRref
+ 694              	.LVL51:
+ 695 0006 0446     		mov	r4, r0
+ 696              	.LVL52:
+ 206:User_App/app_measure.c ****     AFE_PGA_Gain_t gain = BSP_AFE_GetPGAGain();
+ 697              		.loc 1 206 5 is_stmt 1 view .LVU185
+ 698              		.loc 1 206 27 is_stmt 0 view .LVU186
+ 699 0008 FFF7FEFF 		bl	BSP_AFE_GetPGAGain
+ 700              	.LVL53:
+ 207:User_App/app_measure.c **** 
+ 208:User_App/app_measure.c ****     for (i = 0u; i < 4u; i++) {
+ 701              		.loc 1 208 5 is_stmt 1 view .LVU187
+ 702              		.loc 1 208 12 is_stmt 0 view .LVU188
+ 703 000c 0023     		movs	r3, #0
+ 201:User_App/app_measure.c ****     uint32_t i;
+ 704              		.loc 1 201 11 view .LVU189
+ 705 000e 9FED267A 		vldr.32	s14, .L85
+ 706              		.loc 1 208 5 view .LVU190
+ 707 0012 00E0     		b	.L63
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 18
+
+
+ 708              	.LVL54:
+ 709              	.L64:
+ 710              		.loc 1 208 26 is_stmt 1 discriminator 2 view .LVU191
+ 711              		.loc 1 208 27 is_stmt 0 discriminator 2 view .LVU192
+ 712 0014 0133     		adds	r3, r3, #1
+ 713              	.LVL55:
+ 714              	.L63:
+ 715              		.loc 1 208 18 is_stmt 1 discriminator 1 view .LVU193
+ 716              		.loc 1 208 5 is_stmt 0 discriminator 1 view .LVU194
+ 717 0016 032B     		cmp	r3, #3
+ 718 0018 0ED8     		bhi	.L81
+ 719              	.LBB7:
+ 209:User_App/app_measure.c ****         float v = fabsf(s_iq_data[i]);
+ 720              		.loc 1 209 9 is_stmt 1 view .LVU195
+ 721              		.loc 1 209 34 is_stmt 0 view .LVU196
+ 722 001a 244A     		ldr	r2, .L85+4
+ 723 001c 02EB8302 		add	r2, r2, r3, lsl #2
+ 724 0020 D2ED007A 		vldr.32	s15, [r2]
+ 725              		.loc 1 209 15 view .LVU197
+ 726 0024 F0EEE77A 		vabs.f32	s15, s15
+ 727              	.LVL56:
+ 210:User_App/app_measure.c ****         if (v > max_abs) {
+ 728              		.loc 1 210 9 is_stmt 1 view .LVU198
+ 729              		.loc 1 210 12 is_stmt 0 view .LVU199
+ 730 0028 B4EEE77A 		vcmpe.f32	s14, s15
+ 731 002c F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 732 0030 F0D5     		bpl	.L64
+ 211:User_App/app_measure.c ****             max_abs = v;
+ 733              		.loc 1 211 21 view .LVU200
+ 734 0032 B0EE677A 		vmov.f32	s14, s15
+ 735              	.LVL57:
+ 736              		.loc 1 211 21 view .LVU201
+ 737 0036 EDE7     		b	.L64
+ 738              	.LVL58:
+ 739              	.L81:
+ 740              		.loc 1 211 21 view .LVU202
+ 741              	.LBE7:
+ 212:User_App/app_measure.c ****         }
+ 213:User_App/app_measure.c ****     }
+ 214:User_App/app_measure.c **** 
+ 215:User_App/app_measure.c ****     if (max_abs > RANGE_UP_THRESH) {
+ 742              		.loc 1 215 5 is_stmt 1 view .LVU203
+ 743              		.loc 1 215 8 is_stmt 0 view .LVU204
+ 744 0038 DFED1D7A 		vldr.32	s15, .L85+8
+ 745 003c B4EEE77A 		vcmpe.f32	s14, s15
+ 746 0040 F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 747 0044 17DD     		ble	.L78
+ 216:User_App/app_measure.c ****         if (gain > PGA_GAIN_0) {
+ 748              		.loc 1 216 9 is_stmt 1 view .LVU205
+ 749              		.loc 1 216 12 is_stmt 0 view .LVU206
+ 750 0046 28B9     		cbnz	r0, .L82
+ 217:User_App/app_measure.c ****             BSP_AFE_SetPGAGain((AFE_PGA_Gain_t)(gain - 1));
+ 218:User_App/app_measure.c ****             changed = 1u;
+ 219:User_App/app_measure.c ****         } else if (rref > RREF_20R) {
+ 751              		.loc 1 219 16 is_stmt 1 view .LVU207
+ 752              		.loc 1 219 19 is_stmt 0 view .LVU208
+ 753 0048 9CB1     		cbz	r4, .L70
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 19
+
+
+ 220:User_App/app_measure.c ****             BSP_AFE_SetRref((AFE_Rref_t)(rref - 1));
+ 754              		.loc 1 220 13 is_stmt 1 view .LVU209
+ 755              		.loc 1 220 47 is_stmt 0 view .LVU210
+ 756 004a 601E     		subs	r0, r4, #1
+ 757              	.LVL59:
+ 758              		.loc 1 220 13 view .LVU211
+ 759 004c C0B2     		uxtb	r0, r0
+ 760 004e FFF7FEFF 		bl	BSP_AFE_SetRref
+ 761              	.LVL60:
+ 221:User_App/app_measure.c ****             changed = 1u;
+ 762              		.loc 1 221 13 is_stmt 1 view .LVU212
+ 222:User_App/app_measure.c ****         }
+ 223:User_App/app_measure.c ****     } else if (max_abs < RANGE_DOWN_THRESH) {
+ 224:User_App/app_measure.c ****         if (gain < PGA_GAIN_3) {
+ 225:User_App/app_measure.c ****             BSP_AFE_SetPGAGain((AFE_PGA_Gain_t)(gain + 1));
+ 226:User_App/app_measure.c ****             changed = 1u;
+ 227:User_App/app_measure.c ****         } else if (rref < RREF_100K) {
+ 228:User_App/app_measure.c ****             BSP_AFE_SetRref((AFE_Rref_t)(rref + 1));
+ 229:User_App/app_measure.c ****             changed = 1u;
+ 230:User_App/app_measure.c ****         }
+ 231:User_App/app_measure.c ****     }
+ 232:User_App/app_measure.c **** 
+ 233:User_App/app_measure.c ****     if (changed != 0u) {
+ 763              		.loc 1 233 5 view .LVU213
+ 764 0052 03E0     		b	.L69
+ 765              	.LVL61:
+ 766              	.L82:
+ 217:User_App/app_measure.c ****             changed = 1u;
+ 767              		.loc 1 217 13 view .LVU214
+ 217:User_App/app_measure.c ****             changed = 1u;
+ 768              		.loc 1 217 54 is_stmt 0 view .LVU215
+ 769 0054 0138     		subs	r0, r0, #1
+ 770              	.LVL62:
+ 217:User_App/app_measure.c ****             changed = 1u;
+ 771              		.loc 1 217 13 view .LVU216
+ 772 0056 C0B2     		uxtb	r0, r0
+ 773 0058 FFF7FEFF 		bl	BSP_AFE_SetPGAGain
+ 774              	.LVL63:
+ 218:User_App/app_measure.c ****         } else if (rref > RREF_20R) {
+ 775              		.loc 1 218 13 is_stmt 1 view .LVU217
+ 776              		.loc 1 233 5 view .LVU218
+ 777              	.L69:
+ 234:User_App/app_measure.c ****         App_Measure_FilterResetAll(0.0f);
+ 778              		.loc 1 234 9 view .LVU219
+ 779 005c 9FED120A 		vldr.32	s0, .L85
+ 780 0060 FFF7FEFF 		bl	App_Measure_FilterResetAll
+ 781              	.LVL64:
+ 235:User_App/app_measure.c ****         s_result.valid = 0u;
+ 782              		.loc 1 235 9 view .LVU220
+ 783              		.loc 1 235 24 is_stmt 0 view .LVU221
+ 784 0064 134B     		ldr	r3, .L85+12
+ 785 0066 0022     		movs	r2, #0
+ 786 0068 83F82320 		strb	r2, [r3, #35]
+ 236:User_App/app_measure.c ****         App_Measure_ResetStateMachine();
+ 787              		.loc 1 236 9 is_stmt 1 view .LVU222
+ 788 006c FFF7FEFF 		bl	App_Measure_ResetStateMachine
+ 789              	.LVL65:
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 20
+
+
+ 790 0070 0124     		movs	r4, #1
+ 791              	.LVL66:
+ 792              	.L70:
+ 237:User_App/app_measure.c ****     }
+ 238:User_App/app_measure.c **** 
+ 239:User_App/app_measure.c ****     return changed;
+ 793              		.loc 1 239 5 view .LVU223
+ 240:User_App/app_measure.c **** }
+ 794              		.loc 1 240 1 is_stmt 0 view .LVU224
+ 795 0072 2046     		mov	r0, r4
+ 796 0074 10BD     		pop	{r4, pc}
+ 797              	.LVL67:
+ 798              	.L78:
+ 223:User_App/app_measure.c ****         if (gain < PGA_GAIN_3) {
+ 799              		.loc 1 223 12 is_stmt 1 view .LVU225
+ 223:User_App/app_measure.c ****         if (gain < PGA_GAIN_3) {
+ 800              		.loc 1 223 15 is_stmt 0 view .LVU226
+ 801 0076 DFED107A 		vldr.32	s15, .L85+16
+ 802 007a B4EEE77A 		vcmpe.f32	s14, s15
+ 803 007e F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 804 0082 0FD5     		bpl	.L79
+ 224:User_App/app_measure.c ****             BSP_AFE_SetPGAGain((AFE_PGA_Gain_t)(gain + 1));
+ 805              		.loc 1 224 9 is_stmt 1 view .LVU227
+ 224:User_App/app_measure.c ****             BSP_AFE_SetPGAGain((AFE_PGA_Gain_t)(gain + 1));
+ 806              		.loc 1 224 12 is_stmt 0 view .LVU228
+ 807 0084 0228     		cmp	r0, #2
+ 808 0086 03D9     		bls	.L83
+ 227:User_App/app_measure.c ****             BSP_AFE_SetRref((AFE_Rref_t)(rref + 1));
+ 809              		.loc 1 227 16 is_stmt 1 view .LVU229
+ 227:User_App/app_measure.c ****             BSP_AFE_SetRref((AFE_Rref_t)(rref + 1));
+ 810              		.loc 1 227 19 is_stmt 0 view .LVU230
+ 811 0088 022C     		cmp	r4, #2
+ 812 008a 06D9     		bls	.L84
+ 203:User_App/app_measure.c **** 
+ 813              		.loc 1 203 13 view .LVU231
+ 814 008c 0024     		movs	r4, #0
+ 815              	.LVL68:
+ 203:User_App/app_measure.c **** 
+ 816              		.loc 1 203 13 view .LVU232
+ 817 008e F0E7     		b	.L70
+ 818              	.LVL69:
+ 819              	.L83:
+ 225:User_App/app_measure.c ****             changed = 1u;
+ 820              		.loc 1 225 13 is_stmt 1 view .LVU233
+ 225:User_App/app_measure.c ****             changed = 1u;
+ 821              		.loc 1 225 54 is_stmt 0 view .LVU234
+ 822 0090 0130     		adds	r0, r0, #1
+ 823              	.LVL70:
+ 225:User_App/app_measure.c ****             changed = 1u;
+ 824              		.loc 1 225 13 view .LVU235
+ 825 0092 C0B2     		uxtb	r0, r0
+ 826 0094 FFF7FEFF 		bl	BSP_AFE_SetPGAGain
+ 827              	.LVL71:
+ 226:User_App/app_measure.c ****         } else if (rref < RREF_100K) {
+ 828              		.loc 1 226 13 is_stmt 1 view .LVU236
+ 233:User_App/app_measure.c ****         App_Measure_FilterResetAll(0.0f);
+ 829              		.loc 1 233 5 view .LVU237
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 21
+
+
+ 830 0098 E0E7     		b	.L69
+ 831              	.LVL72:
+ 832              	.L84:
+ 228:User_App/app_measure.c ****             changed = 1u;
+ 833              		.loc 1 228 13 view .LVU238
+ 228:User_App/app_measure.c ****             changed = 1u;
+ 834              		.loc 1 228 47 is_stmt 0 view .LVU239
+ 835 009a 601C     		adds	r0, r4, #1
+ 836              	.LVL73:
+ 228:User_App/app_measure.c ****             changed = 1u;
+ 837              		.loc 1 228 13 view .LVU240
+ 838 009c C0B2     		uxtb	r0, r0
+ 839 009e FFF7FEFF 		bl	BSP_AFE_SetRref
+ 840              	.LVL74:
+ 229:User_App/app_measure.c ****         }
+ 841              		.loc 1 229 13 is_stmt 1 view .LVU241
+ 233:User_App/app_measure.c ****         App_Measure_FilterResetAll(0.0f);
+ 842              		.loc 1 233 5 view .LVU242
+ 843 00a2 DBE7     		b	.L69
+ 844              	.LVL75:
+ 845              	.L79:
+ 203:User_App/app_measure.c **** 
+ 846              		.loc 1 203 13 is_stmt 0 view .LVU243
+ 847 00a4 0024     		movs	r4, #0
+ 848              	.LVL76:
+ 203:User_App/app_measure.c **** 
+ 849              		.loc 1 203 13 view .LVU244
+ 850 00a6 E4E7     		b	.L70
+ 851              	.L86:
+ 852              		.align	2
+ 853              	.L85:
+ 854 00a8 00000000 		.word	0
+ 855 00ac 00000000 		.word	.LANCHOR6
+ 856 00b0 9A99593F 		.word	1062836634
+ 857 00b4 00000000 		.word	.LANCHOR7
+ 858 00b8 CDCCCC3D 		.word	1036831949
+ 859              		.cfi_endproc
+ 860              	.LFE252:
+ 862              		.section	.text.App_Measure_CalcImpedance,"ax",%progbits
+ 863              		.align	1
+ 864              		.syntax unified
+ 865              		.thumb
+ 866              		.thumb_func
+ 868              	App_Measure_CalcImpedance:
+ 869              	.LFB253:
+ 241:User_App/app_measure.c **** 
+ 242:User_App/app_measure.c **** static void App_Measure_CalcImpedance(void)
+ 243:User_App/app_measure.c **** {
+ 870              		.loc 1 243 1 is_stmt 1 view -0
+ 871              		.cfi_startproc
+ 872              		@ args = 0, pretend = 0, frame = 0
+ 873              		@ frame_needed = 0, uses_anonymous_args = 0
+ 874 0000 10B5     		push	{r4, lr}
+ 875              	.LCFI11:
+ 876              		.cfi_def_cfa_offset 8
+ 877              		.cfi_offset 4, -8
+ 878              		.cfi_offset 14, -4
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 22
+
+
+ 879 0002 2DED048B 		vpush.64	{d8, d9}
+ 880              	.LCFI12:
+ 881              		.cfi_def_cfa_offset 24
+ 882              		.cfi_offset 80, -24
+ 883              		.cfi_offset 81, -20
+ 884              		.cfi_offset 82, -16
+ 885              		.cfi_offset 83, -12
+ 244:User_App/app_measure.c ****     float a = s_iq_data[0];
+ 886              		.loc 1 244 5 view .LVU246
+ 887              		.loc 1 244 11 is_stmt 0 view .LVU247
+ 888 0006 834B     		ldr	r3, .L128
+ 889 0008 D3ED009A 		vldr.32	s19, [r3]
+ 890              	.LVL77:
+ 245:User_App/app_measure.c ****     float b = s_iq_data[1];
+ 891              		.loc 1 245 5 is_stmt 1 view .LVU248
+ 892              		.loc 1 245 11 is_stmt 0 view .LVU249
+ 893 000c 93ED019A 		vldr.32	s18, [r3, #4]
+ 894              	.LVL78:
+ 246:User_App/app_measure.c ****     float c = s_iq_data[2];
+ 895              		.loc 1 246 5 is_stmt 1 view .LVU250
+ 896              		.loc 1 246 11 is_stmt 0 view .LVU251
+ 897 0010 D3ED028A 		vldr.32	s17, [r3, #8]
+ 898              	.LVL79:
+ 247:User_App/app_measure.c ****     float d = s_iq_data[3];
+ 899              		.loc 1 247 5 is_stmt 1 view .LVU252
+ 900              		.loc 1 247 11 is_stmt 0 view .LVU253
+ 901 0014 93ED038A 		vldr.32	s16, [r3, #12]
+ 902              	.LVL80:
+ 248:User_App/app_measure.c **** 
+ 249:User_App/app_measure.c ****     float rref = BSP_AFE_GetRrefValue();
+ 903              		.loc 1 249 5 is_stmt 1 view .LVU254
+ 904              		.loc 1 249 18 is_stmt 0 view .LVU255
+ 905 0018 FFF7FEFF 		bl	BSP_AFE_GetRrefValue
+ 906              	.LVL81:
+ 250:User_App/app_measure.c ****     float denom = c * c + d * d;
+ 907              		.loc 1 250 5 is_stmt 1 view .LVU256
+ 908              		.loc 1 250 21 is_stmt 0 view .LVU257
+ 909 001c 68EEA87A 		vmul.f32	s15, s17, s17
+ 910              		.loc 1 250 29 view .LVU258
+ 911 0020 28EE087A 		vmul.f32	s14, s16, s16
+ 912              		.loc 1 250 11 view .LVU259
+ 913 0024 77EE877A 		vadd.f32	s15, s15, s14
+ 914              	.LVL82:
+ 251:User_App/app_measure.c **** 
+ 252:User_App/app_measure.c ****     if (denom < 1e-9f) {
+ 915              		.loc 1 252 5 is_stmt 1 view .LVU260
+ 916              		.loc 1 252 8 is_stmt 0 view .LVU261
+ 917 0028 9FED7B7A 		vldr.32	s14, .L128+4
+ 918 002c F4EEC77A 		vcmpe.f32	s15, s14
+ 919 0030 F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 920 0034 06D5     		bpl	.L119
+ 253:User_App/app_measure.c ****         s_result.valid = 0u;
+ 921              		.loc 1 253 9 is_stmt 1 view .LVU262
+ 922              		.loc 1 253 24 is_stmt 0 view .LVU263
+ 923 0036 794B     		ldr	r3, .L128+8
+ 924 0038 0022     		movs	r2, #0
+ 925 003a 83F82320 		strb	r2, [r3, #35]
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 23
+
+
+ 254:User_App/app_measure.c ****         return;
+ 926              		.loc 1 254 9 is_stmt 1 view .LVU264
+ 927              	.LVL83:
+ 928              	.L87:
+ 255:User_App/app_measure.c ****     }
+ 256:User_App/app_measure.c **** 
+ 257:User_App/app_measure.c ****     s_result.re_ohm = (a * c + b * d) / denom * rref;
+ 258:User_App/app_measure.c ****     s_result.im_ohm = (b * c - a * d) / denom * rref;
+ 259:User_App/app_measure.c ****     s_result.z_mag_ohm = sqrtf(s_result.re_ohm * s_result.re_ohm + s_result.im_ohm * s_result.im_oh
+ 260:User_App/app_measure.c ****     s_result.phase_deg = atan2f(s_result.im_ohm, s_result.re_ohm) * 180.0f / PI_F;
+ 261:User_App/app_measure.c **** 
+ 262:User_App/app_measure.c ****     s_result.freq_hz = (float)s_freq_hz;
+ 263:User_App/app_measure.c ****     s_result.rref_range = BSP_AFE_GetRref();
+ 264:User_App/app_measure.c ****     s_result.pga_gain = BSP_AFE_GetPGAGain();
+ 265:User_App/app_measure.c **** 
+ 266:User_App/app_measure.c ****     if (fabsf(s_result.phase_deg) < 45.0f) {
+ 267:User_App/app_measure.c ****         s_result.comp_type = COMP_RESISTOR;
+ 268:User_App/app_measure.c ****         s_result.primary_value = s_result.re_ohm;
+ 269:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 270:User_App/app_measure.c ****     } else if (s_result.im_ohm > 0.0f) {
+ 271:User_App/app_measure.c ****         float omega = 2.0f * PI_F * (float)s_freq_hz;
+ 272:User_App/app_measure.c ****         s_result.comp_type = COMP_INDUCTOR;
+ 273:User_App/app_measure.c ****         s_result.primary_value = s_result.im_ohm / omega;
+ 274:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 275:User_App/app_measure.c ****     } else {
+ 276:User_App/app_measure.c ****         float omega = 2.0f * PI_F * (float)s_freq_hz;
+ 277:User_App/app_measure.c ****         s_result.comp_type = COMP_CAPACITOR;
+ 278:User_App/app_measure.c ****         s_result.primary_value = (fabsf(s_result.im_ohm) > 1e-9f) ? (-1.0f / (omega * s_result.im_o
+ 279:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 280:User_App/app_measure.c ****     }
+ 281:User_App/app_measure.c **** 
+ 282:User_App/app_measure.c ****     s_result.d_factor = (s_result.q_factor > 1e-6f) ? (1.0f / s_result.q_factor) : 0.0f;
+ 283:User_App/app_measure.c ****     s_result.valid = 1u;
+ 284:User_App/app_measure.c **** }
+ 929              		.loc 1 284 1 is_stmt 0 view .LVU265
+ 930 003e BDEC048B 		vldm	sp!, {d8-d9}
+ 931              	.LCFI13:
+ 932              		.cfi_remember_state
+ 933              		.cfi_restore 82
+ 934              		.cfi_restore 83
+ 935              		.cfi_restore 80
+ 936              		.cfi_restore 81
+ 937              		.cfi_def_cfa_offset 8
+ 938 0042 10BD     		pop	{r4, pc}
+ 939              	.LVL84:
+ 940              	.L119:
+ 941              	.LCFI14:
+ 942              		.cfi_restore_state
+ 257:User_App/app_measure.c ****     s_result.im_ohm = (b * c - a * d) / denom * rref;
+ 943              		.loc 1 257 5 is_stmt 1 view .LVU266
+ 257:User_App/app_measure.c ****     s_result.im_ohm = (b * c - a * d) / denom * rref;
+ 944              		.loc 1 257 26 is_stmt 0 view .LVU267
+ 945 0044 29EEA87A 		vmul.f32	s14, s19, s17
+ 257:User_App/app_measure.c ****     s_result.im_ohm = (b * c - a * d) / denom * rref;
+ 946              		.loc 1 257 34 view .LVU268
+ 947 0048 69EE086A 		vmul.f32	s13, s18, s16
+ 257:User_App/app_measure.c ****     s_result.im_ohm = (b * c - a * d) / denom * rref;
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 24
+
+
+ 948              		.loc 1 257 30 view .LVU269
+ 949 004c 37EE267A 		vadd.f32	s14, s14, s13
+ 257:User_App/app_measure.c ****     s_result.im_ohm = (b * c - a * d) / denom * rref;
+ 950              		.loc 1 257 39 view .LVU270
+ 951 0050 C7EE276A 		vdiv.f32	s13, s14, s15
+ 257:User_App/app_measure.c ****     s_result.im_ohm = (b * c - a * d) / denom * rref;
+ 952              		.loc 1 257 47 view .LVU271
+ 953 0054 66EE806A 		vmul.f32	s13, s13, s0
+ 257:User_App/app_measure.c ****     s_result.im_ohm = (b * c - a * d) / denom * rref;
+ 954              		.loc 1 257 21 view .LVU272
+ 955 0058 704C     		ldr	r4, .L128+8
+ 956 005a C4ED006A 		vstr.32	s13, [r4]
+ 258:User_App/app_measure.c ****     s_result.z_mag_ohm = sqrtf(s_result.re_ohm * s_result.re_ohm + s_result.im_ohm * s_result.im_oh
+ 957              		.loc 1 258 5 is_stmt 1 view .LVU273
+ 258:User_App/app_measure.c ****     s_result.z_mag_ohm = sqrtf(s_result.re_ohm * s_result.re_ohm + s_result.im_ohm * s_result.im_oh
+ 958              		.loc 1 258 26 is_stmt 0 view .LVU274
+ 959 005e 29EE289A 		vmul.f32	s18, s18, s17
+ 960              	.LVL85:
+ 258:User_App/app_measure.c ****     s_result.z_mag_ohm = sqrtf(s_result.re_ohm * s_result.re_ohm + s_result.im_ohm * s_result.im_oh
+ 961              		.loc 1 258 34 view .LVU275
+ 962 0062 29EE888A 		vmul.f32	s16, s19, s16
+ 963              	.LVL86:
+ 258:User_App/app_measure.c ****     s_result.z_mag_ohm = sqrtf(s_result.re_ohm * s_result.re_ohm + s_result.im_ohm * s_result.im_oh
+ 964              		.loc 1 258 30 view .LVU276
+ 965 0066 39EE489A 		vsub.f32	s18, s18, s16
+ 258:User_App/app_measure.c ****     s_result.z_mag_ohm = sqrtf(s_result.re_ohm * s_result.re_ohm + s_result.im_ohm * s_result.im_oh
+ 966              		.loc 1 258 39 view .LVU277
+ 967 006a 89EE277A 		vdiv.f32	s14, s18, s15
+ 258:User_App/app_measure.c ****     s_result.z_mag_ohm = sqrtf(s_result.re_ohm * s_result.re_ohm + s_result.im_ohm * s_result.im_oh
+ 968              		.loc 1 258 47 view .LVU278
+ 969 006e 27EE000A 		vmul.f32	s0, s14, s0
+ 970              	.LVL87:
+ 258:User_App/app_measure.c ****     s_result.z_mag_ohm = sqrtf(s_result.re_ohm * s_result.re_ohm + s_result.im_ohm * s_result.im_oh
+ 971              		.loc 1 258 21 view .LVU279
+ 972 0072 84ED010A 		vstr.32	s0, [r4, #4]
+ 259:User_App/app_measure.c ****     s_result.phase_deg = atan2f(s_result.im_ohm, s_result.re_ohm) * 180.0f / PI_F;
+ 973              		.loc 1 259 5 is_stmt 1 view .LVU280
+ 259:User_App/app_measure.c ****     s_result.phase_deg = atan2f(s_result.im_ohm, s_result.re_ohm) * 180.0f / PI_F;
+ 974              		.loc 1 259 48 is_stmt 0 view .LVU281
+ 975 0076 66EEA66A 		vmul.f32	s13, s13, s13
+ 259:User_App/app_measure.c ****     s_result.phase_deg = atan2f(s_result.im_ohm, s_result.re_ohm) * 180.0f / PI_F;
+ 976              		.loc 1 259 84 view .LVU282
+ 977 007a 20EE000A 		vmul.f32	s0, s0, s0
+ 259:User_App/app_measure.c ****     s_result.phase_deg = atan2f(s_result.im_ohm, s_result.re_ohm) * 180.0f / PI_F;
+ 978              		.loc 1 259 26 view .LVU283
+ 979 007e 36EE800A 		vadd.f32	s0, s13, s0
+ 980 0082 FFF7FEFF 		bl	sqrtf
+ 981              	.LVL88:
+ 259:User_App/app_measure.c ****     s_result.phase_deg = atan2f(s_result.im_ohm, s_result.re_ohm) * 180.0f / PI_F;
+ 982              		.loc 1 259 24 view .LVU284
+ 983 0086 84ED020A 		vstr.32	s0, [r4, #8]
+ 260:User_App/app_measure.c **** 
+ 984              		.loc 1 260 5 is_stmt 1 view .LVU285
+ 260:User_App/app_measure.c **** 
+ 985              		.loc 1 260 26 is_stmt 0 view .LVU286
+ 986 008a D4ED000A 		vldr.32	s1, [r4]
+ 987 008e 94ED010A 		vldr.32	s0, [r4, #4]
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 25
+
+
+ 988 0092 FFF7FEFF 		bl	atan2f
+ 989              	.LVL89:
+ 260:User_App/app_measure.c **** 
+ 990              		.loc 1 260 67 view .LVU287
+ 991 0096 DFED627A 		vldr.32	s15, .L128+12
+ 992 009a 20EE270A 		vmul.f32	s0, s0, s15
+ 260:User_App/app_measure.c **** 
+ 993              		.loc 1 260 76 view .LVU288
+ 994 009e 9FED617A 		vldr.32	s14, .L128+16
+ 995 00a2 C0EE077A 		vdiv.f32	s15, s0, s14
+ 260:User_App/app_measure.c **** 
+ 996              		.loc 1 260 24 view .LVU289
+ 997 00a6 C4ED037A 		vstr.32	s15, [r4, #12]
+ 262:User_App/app_measure.c ****     s_result.rref_range = BSP_AFE_GetRref();
+ 998              		.loc 1 262 5 is_stmt 1 view .LVU290
+ 262:User_App/app_measure.c ****     s_result.rref_range = BSP_AFE_GetRref();
+ 999              		.loc 1 262 24 is_stmt 0 view .LVU291
+ 1000 00aa 5F4B     		ldr	r3, .L128+20
+ 1001 00ac D3ED007A 		vldr.32	s15, [r3]	@ int
+ 1002 00b0 F8EE677A 		vcvt.f32.u32	s15, s15
+ 262:User_App/app_measure.c ****     s_result.rref_range = BSP_AFE_GetRref();
+ 1003              		.loc 1 262 22 view .LVU292
+ 1004 00b4 C4ED077A 		vstr.32	s15, [r4, #28]
+ 263:User_App/app_measure.c ****     s_result.pga_gain = BSP_AFE_GetPGAGain();
+ 1005              		.loc 1 263 5 is_stmt 1 view .LVU293
+ 263:User_App/app_measure.c ****     s_result.pga_gain = BSP_AFE_GetPGAGain();
+ 1006              		.loc 1 263 27 is_stmt 0 view .LVU294
+ 1007 00b8 FFF7FEFF 		bl	BSP_AFE_GetRref
+ 1008              	.LVL90:
+ 263:User_App/app_measure.c ****     s_result.pga_gain = BSP_AFE_GetPGAGain();
+ 1009              		.loc 1 263 25 view .LVU295
+ 1010 00bc 84F82100 		strb	r0, [r4, #33]
+ 264:User_App/app_measure.c **** 
+ 1011              		.loc 1 264 5 is_stmt 1 view .LVU296
+ 264:User_App/app_measure.c **** 
+ 1012              		.loc 1 264 25 is_stmt 0 view .LVU297
+ 1013 00c0 FFF7FEFF 		bl	BSP_AFE_GetPGAGain
+ 1014              	.LVL91:
+ 264:User_App/app_measure.c **** 
+ 1015              		.loc 1 264 23 view .LVU298
+ 1016 00c4 84F82200 		strb	r0, [r4, #34]
+ 266:User_App/app_measure.c ****         s_result.comp_type = COMP_RESISTOR;
+ 1017              		.loc 1 266 5 is_stmt 1 view .LVU299
+ 266:User_App/app_measure.c ****         s_result.comp_type = COMP_RESISTOR;
+ 1018              		.loc 1 266 23 is_stmt 0 view .LVU300
+ 1019 00c8 D4ED037A 		vldr.32	s15, [r4, #12]
+ 266:User_App/app_measure.c ****         s_result.comp_type = COMP_RESISTOR;
+ 1020              		.loc 1 266 9 view .LVU301
+ 1021 00cc F0EEE77A 		vabs.f32	s15, s15
+ 266:User_App/app_measure.c ****         s_result.comp_type = COMP_RESISTOR;
+ 1022              		.loc 1 266 8 view .LVU302
+ 1023 00d0 9FED567A 		vldr.32	s14, .L128+24
+ 1024 00d4 F4EEC77A 		vcmpe.f32	s15, s14
+ 1025 00d8 F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 1026 00dc 30D5     		bpl	.L120
+ 267:User_App/app_measure.c ****         s_result.primary_value = s_result.re_ohm;
+ 1027              		.loc 1 267 9 is_stmt 1 view .LVU303
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 26
+
+
+ 267:User_App/app_measure.c ****         s_result.primary_value = s_result.re_ohm;
+ 1028              		.loc 1 267 28 is_stmt 0 view .LVU304
+ 1029 00de 0022     		movs	r2, #0
+ 1030 00e0 84F82020 		strb	r2, [r4, #32]
+ 268:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1031              		.loc 1 268 9 is_stmt 1 view .LVU305
+ 268:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1032              		.loc 1 268 42 is_stmt 0 view .LVU306
+ 1033 00e4 D4ED007A 		vldr.32	s15, [r4]
+ 268:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1034              		.loc 1 268 32 view .LVU307
+ 1035 00e8 C4ED047A 		vstr.32	s15, [r4, #16]
+ 269:User_App/app_measure.c ****     } else if (s_result.im_ohm > 0.0f) {
+ 1036              		.loc 1 269 9 is_stmt 1 view .LVU308
+ 269:User_App/app_measure.c ****     } else if (s_result.im_ohm > 0.0f) {
+ 1037              		.loc 1 269 30 is_stmt 0 view .LVU309
+ 1038 00ec F0EEE76A 		vabs.f32	s13, s15
+ 269:User_App/app_measure.c ****     } else if (s_result.im_ohm > 0.0f) {
+ 1039              		.loc 1 269 105 view .LVU310
+ 1040 00f0 9FED4F7A 		vldr.32	s14, .L128+28
+ 1041 00f4 F4EEC76A 		vcmpe.f32	s13, s14
+ 1042 00f8 F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 1043 00fc 1DDD     		ble	.L121
+ 269:User_App/app_measure.c ****     } else if (s_result.im_ohm > 0.0f) {
+ 1044              		.loc 1 269 78 discriminator 1 view .LVU311
+ 1045 00fe D4ED016A 		vldr.32	s13, [r4, #4]
+ 269:User_App/app_measure.c ****     } else if (s_result.im_ohm > 0.0f) {
+ 1046              		.loc 1 269 86 discriminator 1 view .LVU312
+ 1047 0102 86EEA77A 		vdiv.f32	s14, s13, s15
+ 269:User_App/app_measure.c ****     } else if (s_result.im_ohm > 0.0f) {
+ 1048              		.loc 1 269 105 discriminator 1 view .LVU313
+ 1049 0106 F0EEC77A 		vabs.f32	s15, s14
+ 1050              	.L93:
+ 269:User_App/app_measure.c ****     } else if (s_result.im_ohm > 0.0f) {
+ 1051              		.loc 1 269 27 discriminator 4 view .LVU314
+ 1052 010a 444B     		ldr	r3, .L128+8
+ 1053 010c C3ED057A 		vstr.32	s15, [r3, #20]
+ 1054              	.L95:
+ 282:User_App/app_measure.c ****     s_result.valid = 1u;
+ 1055              		.loc 1 282 5 is_stmt 1 view .LVU315
+ 282:User_App/app_measure.c ****     s_result.valid = 1u;
+ 1056              		.loc 1 282 34 is_stmt 0 view .LVU316
+ 1057 0110 424B     		ldr	r3, .L128+8
+ 1058 0112 D3ED057A 		vldr.32	s15, [r3, #20]
+ 282:User_App/app_measure.c ****     s_result.valid = 1u;
+ 1059              		.loc 1 282 82 view .LVU317
+ 1060 0116 9FED467A 		vldr.32	s14, .L128+28
+ 1061 011a F4EEC77A 		vcmpe.f32	s15, s14
+ 1062 011e F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 1063 0122 74DD     		ble	.L126
+ 282:User_App/app_measure.c ****     s_result.valid = 1u;
+ 1064              		.loc 1 282 82 discriminator 1 view .LVU318
+ 1065 0124 F7EE006A 		vmov.f32	s13, #1.0e+0
+ 1066 0128 86EEA77A 		vdiv.f32	s14, s13, s15
+ 1067              	.L104:
+ 282:User_App/app_measure.c ****     s_result.valid = 1u;
+ 1068              		.loc 1 282 23 discriminator 4 view .LVU319
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 27
+
+
+ 1069 012c 3B4B     		ldr	r3, .L128+8
+ 1070 012e 83ED067A 		vstr.32	s14, [r3, #24]
+ 283:User_App/app_measure.c **** }
+ 1071              		.loc 1 283 5 is_stmt 1 discriminator 4 view .LVU320
+ 283:User_App/app_measure.c **** }
+ 1072              		.loc 1 283 20 is_stmt 0 discriminator 4 view .LVU321
+ 1073 0132 0122     		movs	r2, #1
+ 1074 0134 83F82320 		strb	r2, [r3, #35]
+ 1075 0138 81E7     		b	.L87
+ 1076              	.L121:
+ 269:User_App/app_measure.c ****     } else if (s_result.im_ohm > 0.0f) {
+ 1077              		.loc 1 269 105 view .LVU322
+ 1078 013a DFED3E7A 		vldr.32	s15, .L128+32
+ 1079 013e E4E7     		b	.L93
+ 1080              	.L120:
+ 270:User_App/app_measure.c ****         float omega = 2.0f * PI_F * (float)s_freq_hz;
+ 1081              		.loc 1 270 12 is_stmt 1 view .LVU323
+ 270:User_App/app_measure.c ****         float omega = 2.0f * PI_F * (float)s_freq_hz;
+ 1082              		.loc 1 270 24 is_stmt 0 view .LVU324
+ 1083 0140 364B     		ldr	r3, .L128+8
+ 1084 0142 D3ED017A 		vldr.32	s15, [r3, #4]
+ 270:User_App/app_measure.c ****         float omega = 2.0f * PI_F * (float)s_freq_hz;
+ 1085              		.loc 1 270 15 view .LVU325
+ 1086 0146 F5EEC07A 		vcmpe.f32	s15, #0
+ 1087 014a F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 1088 014e 26DD     		ble	.L122
+ 1089              	.LBB8:
+ 271:User_App/app_measure.c ****         s_result.comp_type = COMP_INDUCTOR;
+ 1090              		.loc 1 271 9 is_stmt 1 view .LVU326
+ 271:User_App/app_measure.c ****         s_result.comp_type = COMP_INDUCTOR;
+ 1091              		.loc 1 271 37 is_stmt 0 view .LVU327
+ 1092 0150 354B     		ldr	r3, .L128+20
+ 1093 0152 93ED007A 		vldr.32	s14, [r3]	@ int
+ 1094 0156 B8EE477A 		vcvt.f32.u32	s14, s14
+ 271:User_App/app_measure.c ****         s_result.comp_type = COMP_INDUCTOR;
+ 1095              		.loc 1 271 15 view .LVU328
+ 1096 015a DFED376A 		vldr.32	s13, .L128+36
+ 1097 015e 27EE267A 		vmul.f32	s14, s14, s13
+ 1098              	.LVL92:
+ 272:User_App/app_measure.c ****         s_result.primary_value = s_result.im_ohm / omega;
+ 1099              		.loc 1 272 9 is_stmt 1 view .LVU329
+ 272:User_App/app_measure.c ****         s_result.primary_value = s_result.im_ohm / omega;
+ 1100              		.loc 1 272 28 is_stmt 0 view .LVU330
+ 1101 0162 2E4B     		ldr	r3, .L128+8
+ 1102 0164 0222     		movs	r2, #2
+ 1103 0166 83F82020 		strb	r2, [r3, #32]
+ 273:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1104              		.loc 1 273 9 is_stmt 1 view .LVU331
+ 273:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1105              		.loc 1 273 50 is_stmt 0 view .LVU332
+ 1106 016a C7EE876A 		vdiv.f32	s13, s15, s14
+ 273:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1107              		.loc 1 273 32 view .LVU333
+ 1108 016e C3ED046A 		vstr.32	s13, [r3, #16]
+ 274:User_App/app_measure.c ****     } else {
+ 1109              		.loc 1 274 9 is_stmt 1 view .LVU334
+ 274:User_App/app_measure.c ****     } else {
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 28
+
+
+ 1110              		.loc 1 274 44 is_stmt 0 view .LVU335
+ 1111 0172 D3ED006A 		vldr.32	s13, [r3]
+ 274:User_App/app_measure.c ****     } else {
+ 1112              		.loc 1 274 30 view .LVU336
+ 1113 0176 B0EEE66A 		vabs.f32	s12, s13
+ 274:User_App/app_measure.c ****     } else {
+ 1114              		.loc 1 274 105 view .LVU337
+ 1115 017a 9FED2D7A 		vldr.32	s14, .L128+28
+ 1116              	.LVL93:
+ 274:User_App/app_measure.c ****     } else {
+ 1117              		.loc 1 274 105 view .LVU338
+ 1118 017e B4EEC76A 		vcmpe.f32	s12, s14
+ 1119 0182 F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 1120 0186 07DD     		ble	.L123
+ 274:User_App/app_measure.c ****     } else {
+ 1121              		.loc 1 274 86 discriminator 1 view .LVU339
+ 1122 0188 87EEA67A 		vdiv.f32	s14, s15, s13
+ 274:User_App/app_measure.c ****     } else {
+ 1123              		.loc 1 274 105 discriminator 1 view .LVU340
+ 1124 018c F0EEC77A 		vabs.f32	s15, s14
+ 1125              	.L98:
+ 274:User_App/app_measure.c ****     } else {
+ 1126              		.loc 1 274 27 discriminator 4 view .LVU341
+ 1127 0190 224B     		ldr	r3, .L128+8
+ 1128 0192 C3ED057A 		vstr.32	s15, [r3, #20]
+ 1129              	.LBE8:
+ 1130 0196 BBE7     		b	.L95
+ 1131              	.L123:
+ 1132              	.LBB9:
+ 274:User_App/app_measure.c ****     } else {
+ 1133              		.loc 1 274 105 view .LVU342
+ 1134 0198 DFED267A 		vldr.32	s15, .L128+32
+ 1135 019c F8E7     		b	.L98
+ 1136              	.LVL94:
+ 1137              	.L122:
+ 274:User_App/app_measure.c ****     } else {
+ 1138              		.loc 1 274 105 view .LVU343
+ 1139              	.LBE9:
+ 1140              	.LBB10:
+ 276:User_App/app_measure.c ****         s_result.comp_type = COMP_CAPACITOR;
+ 1141              		.loc 1 276 9 is_stmt 1 view .LVU344
+ 276:User_App/app_measure.c ****         s_result.comp_type = COMP_CAPACITOR;
+ 1142              		.loc 1 276 37 is_stmt 0 view .LVU345
+ 1143 019e 224B     		ldr	r3, .L128+20
+ 1144 01a0 93ED007A 		vldr.32	s14, [r3]	@ int
+ 1145 01a4 B8EE477A 		vcvt.f32.u32	s14, s14
+ 276:User_App/app_measure.c ****         s_result.comp_type = COMP_CAPACITOR;
+ 1146              		.loc 1 276 15 view .LVU346
+ 1147 01a8 DFED236A 		vldr.32	s13, .L128+36
+ 1148 01ac 27EE267A 		vmul.f32	s14, s14, s13
+ 1149              	.LVL95:
+ 277:User_App/app_measure.c ****         s_result.primary_value = (fabsf(s_result.im_ohm) > 1e-9f) ? (-1.0f / (omega * s_result.im_o
+ 1150              		.loc 1 277 9 is_stmt 1 view .LVU347
+ 277:User_App/app_measure.c ****         s_result.primary_value = (fabsf(s_result.im_ohm) > 1e-9f) ? (-1.0f / (omega * s_result.im_o
+ 1151              		.loc 1 277 28 is_stmt 0 view .LVU348
+ 1152 01b0 1A4B     		ldr	r3, .L128+8
+ 1153 01b2 0122     		movs	r2, #1
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 29
+
+
+ 1154 01b4 83F82020 		strb	r2, [r3, #32]
+ 278:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1155              		.loc 1 278 9 is_stmt 1 view .LVU349
+ 278:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1156              		.loc 1 278 35 is_stmt 0 view .LVU350
+ 1157 01b8 F0EEE76A 		vabs.f32	s13, s15
+ 278:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1158              		.loc 1 278 105 view .LVU351
+ 1159 01bc 9FED166A 		vldr.32	s12, .L128+4
+ 1160 01c0 F4EEC66A 		vcmpe.f32	s13, s12
+ 1161 01c4 F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 1162 01c8 1BDD     		ble	.L124
+ 278:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1163              		.loc 1 278 85 discriminator 1 view .LVU352
+ 1164 01ca 27EE877A 		vmul.f32	s14, s15, s14
+ 1165              	.LVL96:
+ 278:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1166              		.loc 1 278 105 discriminator 1 view .LVU353
+ 1167 01ce BFEE006A 		vmov.f32	s12, #-1.0e+0
+ 1168 01d2 C6EE076A 		vdiv.f32	s13, s12, s14
+ 1169              	.L100:
+ 278:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1170              		.loc 1 278 32 discriminator 4 view .LVU354
+ 1171 01d6 114B     		ldr	r3, .L128+8
+ 1172 01d8 C3ED046A 		vstr.32	s13, [r3, #16]
+ 279:User_App/app_measure.c ****     }
+ 1173              		.loc 1 279 9 is_stmt 1 discriminator 4 view .LVU355
+ 279:User_App/app_measure.c ****     }
+ 1174              		.loc 1 279 44 is_stmt 0 discriminator 4 view .LVU356
+ 1175 01dc D3ED006A 		vldr.32	s13, [r3]
+ 279:User_App/app_measure.c ****     }
+ 1176              		.loc 1 279 30 discriminator 4 view .LVU357
+ 1177 01e0 B0EEE66A 		vabs.f32	s12, s13
+ 279:User_App/app_measure.c ****     }
+ 1178              		.loc 1 279 105 discriminator 4 view .LVU358
+ 1179 01e4 9FED127A 		vldr.32	s14, .L128+28
+ 1180 01e8 B4EEC76A 		vcmpe.f32	s12, s14
+ 1181 01ec F1EE10FA 		vmrs	APSR_nzcv, FPSCR
+ 1182 01f0 0ADD     		ble	.L125
+ 279:User_App/app_measure.c ****     }
+ 1183              		.loc 1 279 86 discriminator 1 view .LVU359
+ 1184 01f2 87EEA67A 		vdiv.f32	s14, s15, s13
+ 279:User_App/app_measure.c ****     }
+ 1185              		.loc 1 279 105 discriminator 1 view .LVU360
+ 1186 01f6 F0EEC77A 		vabs.f32	s15, s14
+ 1187              	.L102:
+ 279:User_App/app_measure.c ****     }
+ 1188              		.loc 1 279 27 discriminator 4 view .LVU361
+ 1189 01fa 084B     		ldr	r3, .L128+8
+ 1190 01fc C3ED057A 		vstr.32	s15, [r3, #20]
+ 1191 0200 86E7     		b	.L95
+ 1192              	.LVL97:
+ 1193              	.L124:
+ 278:User_App/app_measure.c ****         s_result.q_factor = (fabsf(s_result.re_ohm) > 1e-6f) ? fabsf(s_result.im_ohm / s_result.re_
+ 1194              		.loc 1 278 105 view .LVU362
+ 1195 0202 DFED0C6A 		vldr.32	s13, .L128+32
+ 1196 0206 E6E7     		b	.L100
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 30
+
+
+ 1197              	.LVL98:
+ 1198              	.L125:
+ 279:User_App/app_measure.c ****     }
+ 1199              		.loc 1 279 105 view .LVU363
+ 1200 0208 DFED0A7A 		vldr.32	s15, .L128+32
+ 1201 020c F5E7     		b	.L102
+ 1202              	.LVL99:
+ 1203              	.L126:
+ 279:User_App/app_measure.c ****     }
+ 1204              		.loc 1 279 105 view .LVU364
+ 1205              	.LBE10:
+ 282:User_App/app_measure.c ****     s_result.valid = 1u;
+ 1206              		.loc 1 282 82 view .LVU365
+ 1207 020e 9FED097A 		vldr.32	s14, .L128+32
+ 1208 0212 8BE7     		b	.L104
+ 1209              	.L129:
+ 1210              		.align	2
+ 1211              	.L128:
+ 1212 0214 00000000 		.word	.LANCHOR6
+ 1213 0218 5F708930 		.word	814313567
+ 1214 021c 00000000 		.word	.LANCHOR7
+ 1215 0220 00003443 		.word	1127481344
+ 1216 0224 DB0F4940 		.word	1078530011
+ 1217 0228 00000000 		.word	.LANCHOR8
+ 1218 022c 00003442 		.word	1110704128
+ 1219 0230 BD378635 		.word	897988541
+ 1220 0234 00000000 		.word	0
+ 1221 0238 DB0FC940 		.word	1086918619
+ 1222              		.cfi_endproc
+ 1223              	.LFE253:
+ 1225              		.section	.text.App_Measure_SetFreq,"ax",%progbits
+ 1226              		.align	1
+ 1227              		.global	App_Measure_SetFreq
+ 1228              		.syntax unified
+ 1229              		.thumb
+ 1230              		.thumb_func
+ 1232              	App_Measure_SetFreq:
+ 1233              	.LVL100:
+ 1234              	.LFB255:
+ 285:User_App/app_measure.c **** 
+ 286:User_App/app_measure.c **** void App_Measure_Init(void)
+ 287:User_App/app_measure.c **** {
+ 288:User_App/app_measure.c ****     uint32_t i;
+ 289:User_App/app_measure.c **** 
+ 290:User_App/app_measure.c ****     memset(&s_result, 0, sizeof(s_result));
+ 291:User_App/app_measure.c ****     memset(s_iq_data, 0, sizeof(s_iq_data));
+ 292:User_App/app_measure.c **** 
+ 293:User_App/app_measure.c ****     for (i = 0u; i < 4u; i++) {
+ 294:User_App/app_measure.c ****         App_Measure_FilterInit(&s_filter[i], 0.05f, 0.5f, 0.1f);
+ 295:User_App/app_measure.c ****     }
+ 296:User_App/app_measure.c **** 
+ 297:User_App/app_measure.c ****     BSP_AFE_Init();
+ 298:User_App/app_measure.c **** 
+ 299:User_App/app_measure.c ****     AD9834_Init();
+ 300:User_App/app_measure.c ****     AD9834_Select_Wave(SINE_WAVE);
+ 301:User_App/app_measure.c **** 
+ 302:User_App/app_measure.c ****     BSP_TIM4_Init();
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 31
+
+
+ 303:User_App/app_measure.c **** 
+ 304:User_App/app_measure.c ****     s_adc_dma_ok = App_Measure_PrepareAdcDma();
+ 305:User_App/app_measure.c **** 
+ 306:User_App/app_measure.c ****     App_Measure_SetFreq(1000u);
+ 307:User_App/app_measure.c ****     App_Measure_ResetStateMachine();
+ 308:User_App/app_measure.c **** }
+ 309:User_App/app_measure.c **** 
+ 310:User_App/app_measure.c **** void App_Measure_SetFreq(uint32_t freq_hz)
+ 311:User_App/app_measure.c **** {
+ 1235              		.loc 1 311 1 is_stmt 1 view -0
+ 1236              		.cfi_startproc
+ 1237              		@ args = 0, pretend = 0, frame = 0
+ 1238              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1239              		.loc 1 311 1 is_stmt 0 view .LVU367
+ 1240 0000 10B5     		push	{r4, lr}
+ 1241              	.LCFI15:
+ 1242              		.cfi_def_cfa_offset 8
+ 1243              		.cfi_offset 4, -8
+ 1244              		.cfi_offset 14, -4
+ 312:User_App/app_measure.c ****     uint32_t new_freq = App_Measure_NormalizeFreq(freq_hz);
+ 1245              		.loc 1 312 5 is_stmt 1 view .LVU368
+ 1246              		.loc 1 312 25 is_stmt 0 view .LVU369
+ 1247 0002 FFF7FEFF 		bl	App_Measure_NormalizeFreq
+ 1248              	.LVL101:
+ 1249              		.loc 1 312 25 view .LVU370
+ 1250 0006 0446     		mov	r4, r0
+ 1251              	.LVL102:
+ 313:User_App/app_measure.c **** 
+ 314:User_App/app_measure.c ****     s_freq_hz = new_freq;
+ 1252              		.loc 1 314 5 is_stmt 1 view .LVU371
+ 1253              		.loc 1 314 15 is_stmt 0 view .LVU372
+ 1254 0008 0C4B     		ldr	r3, .L132
+ 1255 000a 1860     		str	r0, [r3]
+ 315:User_App/app_measure.c **** 
+ 316:User_App/app_measure.c ****     AD9834_Set_Freq(FREQ_0, (unsigned long)new_freq);
+ 1256              		.loc 1 316 5 is_stmt 1 view .LVU373
+ 1257 000c 0146     		mov	r1, r0
+ 1258 000e 0020     		movs	r0, #0
+ 1259              	.LVL103:
+ 1260              		.loc 1 316 5 is_stmt 0 view .LVU374
+ 1261 0010 FFF7FEFF 		bl	AD9834_Set_Freq
+ 1262              	.LVL104:
+ 317:User_App/app_measure.c ****     BSP_TIM4_SetFreq(new_freq);
+ 1263              		.loc 1 317 5 is_stmt 1 view .LVU375
+ 1264 0014 2046     		mov	r0, r4
+ 1265 0016 FFF7FEFF 		bl	BSP_TIM4_SetFreq
+ 1266              	.LVL105:
+ 318:User_App/app_measure.c ****     BSP_AFE_SetLPF(App_Measure_FreqToLpf(new_freq));
+ 1267              		.loc 1 318 5 view .LVU376
+ 1268 001a 2046     		mov	r0, r4
+ 1269 001c FFF7FEFF 		bl	App_Measure_FreqToLpf
+ 1270              	.LVL106:
+ 1271 0020 FFF7FEFF 		bl	BSP_AFE_SetLPF
+ 1272              	.LVL107:
+ 319:User_App/app_measure.c **** 
+ 320:User_App/app_measure.c ****     App_Measure_FilterResetAll(0.0f);
+ 1273              		.loc 1 320 5 view .LVU377
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 32
+
+
+ 1274 0024 9FED060A 		vldr.32	s0, .L132+4
+ 1275 0028 FFF7FEFF 		bl	App_Measure_FilterResetAll
+ 1276              	.LVL108:
+ 321:User_App/app_measure.c ****     s_result.valid = 0u;
+ 1277              		.loc 1 321 5 view .LVU378
+ 1278              		.loc 1 321 20 is_stmt 0 view .LVU379
+ 1279 002c 054B     		ldr	r3, .L132+8
+ 1280 002e 0022     		movs	r2, #0
+ 1281 0030 83F82320 		strb	r2, [r3, #35]
+ 322:User_App/app_measure.c ****     App_Measure_ResetStateMachine();
+ 1282              		.loc 1 322 5 is_stmt 1 view .LVU380
+ 1283 0034 FFF7FEFF 		bl	App_Measure_ResetStateMachine
+ 1284              	.LVL109:
+ 323:User_App/app_measure.c **** }
+ 1285              		.loc 1 323 1 is_stmt 0 view .LVU381
+ 1286 0038 10BD     		pop	{r4, pc}
+ 1287              	.LVL110:
+ 1288              	.L133:
+ 1289              		.loc 1 323 1 view .LVU382
+ 1290 003a 00BF     		.align	2
+ 1291              	.L132:
+ 1292 003c 00000000 		.word	.LANCHOR8
+ 1293 0040 00000000 		.word	0
+ 1294 0044 00000000 		.word	.LANCHOR7
+ 1295              		.cfi_endproc
+ 1296              	.LFE255:
+ 1298              		.section	.text.App_Measure_Init,"ax",%progbits
+ 1299              		.align	1
+ 1300              		.global	App_Measure_Init
+ 1301              		.syntax unified
+ 1302              		.thumb
+ 1303              		.thumb_func
+ 1305              	App_Measure_Init:
+ 1306              	.LFB254:
+ 287:User_App/app_measure.c ****     uint32_t i;
+ 1307              		.loc 1 287 1 is_stmt 1 view -0
+ 1308              		.cfi_startproc
+ 1309              		@ args = 0, pretend = 0, frame = 0
+ 1310              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1311 0000 10B5     		push	{r4, lr}
+ 1312              	.LCFI16:
+ 1313              		.cfi_def_cfa_offset 8
+ 1314              		.cfi_offset 4, -8
+ 1315              		.cfi_offset 14, -4
+ 288:User_App/app_measure.c **** 
+ 1316              		.loc 1 288 5 view .LVU384
+ 290:User_App/app_measure.c ****     memset(s_iq_data, 0, sizeof(s_iq_data));
+ 1317              		.loc 1 290 5 view .LVU385
+ 1318 0002 2422     		movs	r2, #36
+ 1319 0004 0021     		movs	r1, #0
+ 1320 0006 1748     		ldr	r0, .L138
+ 1321 0008 FFF7FEFF 		bl	memset
+ 1322              	.LVL111:
+ 291:User_App/app_measure.c **** 
+ 1323              		.loc 1 291 5 view .LVU386
+ 1324 000c 164B     		ldr	r3, .L138+4
+ 1325 000e 0024     		movs	r4, #0
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 33
+
+
+ 1326 0010 1C60     		str	r4, [r3]
+ 1327 0012 5C60     		str	r4, [r3, #4]
+ 1328 0014 9C60     		str	r4, [r3, #8]
+ 1329 0016 DC60     		str	r4, [r3, #12]
+ 293:User_App/app_measure.c ****         App_Measure_FilterInit(&s_filter[i], 0.05f, 0.5f, 0.1f);
+ 1330              		.loc 1 293 5 view .LVU387
+ 1331              	.LVL112:
+ 293:User_App/app_measure.c ****         App_Measure_FilterInit(&s_filter[i], 0.05f, 0.5f, 0.1f);
+ 1332              		.loc 1 293 5 is_stmt 0 view .LVU388
+ 1333 0018 0DE0     		b	.L135
+ 1334              	.LVL113:
+ 1335              	.L136:
+ 294:User_App/app_measure.c ****     }
+ 1336              		.loc 1 294 9 is_stmt 1 discriminator 3 view .LVU389
+ 1337 001a 04EB8400 		add	r0, r4, r4, lsl #2
+ 1338 001e 9FED131A 		vldr.32	s2, .L138+8
+ 1339 0022 F6EE000A 		vmov.f32	s1, #5.0e-1
+ 1340 0026 9FED120A 		vldr.32	s0, .L138+12
+ 1341 002a 124B     		ldr	r3, .L138+16
+ 1342 002c 03EB8000 		add	r0, r3, r0, lsl #2
+ 1343 0030 FFF7FEFF 		bl	App_Measure_FilterInit
+ 1344              	.LVL114:
+ 293:User_App/app_measure.c ****         App_Measure_FilterInit(&s_filter[i], 0.05f, 0.5f, 0.1f);
+ 1345              		.loc 1 293 26 discriminator 3 view .LVU390
+ 293:User_App/app_measure.c ****         App_Measure_FilterInit(&s_filter[i], 0.05f, 0.5f, 0.1f);
+ 1346              		.loc 1 293 27 is_stmt 0 discriminator 3 view .LVU391
+ 1347 0034 0134     		adds	r4, r4, #1
+ 1348              	.LVL115:
+ 1349              	.L135:
+ 293:User_App/app_measure.c ****         App_Measure_FilterInit(&s_filter[i], 0.05f, 0.5f, 0.1f);
+ 1350              		.loc 1 293 18 is_stmt 1 discriminator 1 view .LVU392
+ 293:User_App/app_measure.c ****         App_Measure_FilterInit(&s_filter[i], 0.05f, 0.5f, 0.1f);
+ 1351              		.loc 1 293 5 is_stmt 0 discriminator 1 view .LVU393
+ 1352 0036 032C     		cmp	r4, #3
+ 1353 0038 EFD9     		bls	.L136
+ 297:User_App/app_measure.c **** 
+ 1354              		.loc 1 297 5 is_stmt 1 view .LVU394
+ 1355 003a FFF7FEFF 		bl	BSP_AFE_Init
+ 1356              	.LVL116:
+ 299:User_App/app_measure.c ****     AD9834_Select_Wave(SINE_WAVE);
+ 1357              		.loc 1 299 5 view .LVU395
+ 1358 003e FFF7FEFF 		bl	AD9834_Init
+ 1359              	.LVL117:
+ 300:User_App/app_measure.c **** 
+ 1360              		.loc 1 300 5 view .LVU396
+ 1361 0042 42F20800 		movw	r0, #8200
+ 1362 0046 FFF7FEFF 		bl	AD9834_Select_Wave
+ 1363              	.LVL118:
+ 302:User_App/app_measure.c **** 
+ 1364              		.loc 1 302 5 view .LVU397
+ 1365 004a FFF7FEFF 		bl	BSP_TIM4_Init
+ 1366              	.LVL119:
+ 304:User_App/app_measure.c **** 
+ 1367              		.loc 1 304 5 view .LVU398
+ 304:User_App/app_measure.c **** 
+ 1368              		.loc 1 304 20 is_stmt 0 view .LVU399
+ 1369 004e FFF7FEFF 		bl	App_Measure_PrepareAdcDma
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 34
+
+
+ 1370              	.LVL120:
+ 304:User_App/app_measure.c **** 
+ 1371              		.loc 1 304 18 view .LVU400
+ 1372 0052 094B     		ldr	r3, .L138+20
+ 1373 0054 1870     		strb	r0, [r3]
+ 306:User_App/app_measure.c ****     App_Measure_ResetStateMachine();
+ 1374              		.loc 1 306 5 is_stmt 1 view .LVU401
+ 1375 0056 4FF47A70 		mov	r0, #1000
+ 1376 005a FFF7FEFF 		bl	App_Measure_SetFreq
+ 1377              	.LVL121:
+ 307:User_App/app_measure.c **** }
+ 1378              		.loc 1 307 5 view .LVU402
+ 1379 005e FFF7FEFF 		bl	App_Measure_ResetStateMachine
+ 1380              	.LVL122:
+ 308:User_App/app_measure.c **** 
+ 1381              		.loc 1 308 1 is_stmt 0 view .LVU403
+ 1382 0062 10BD     		pop	{r4, pc}
+ 1383              	.LVL123:
+ 1384              	.L139:
+ 308:User_App/app_measure.c **** 
+ 1385              		.loc 1 308 1 view .LVU404
+ 1386              		.align	2
+ 1387              	.L138:
+ 1388 0064 00000000 		.word	.LANCHOR7
+ 1389 0068 00000000 		.word	.LANCHOR6
+ 1390 006c CDCCCC3D 		.word	1036831949
+ 1391 0070 CDCC4C3D 		.word	1028443341
+ 1392 0074 00000000 		.word	.LANCHOR2
+ 1393 0078 00000000 		.word	.LANCHOR5
+ 1394              		.cfi_endproc
+ 1395              	.LFE254:
+ 1397              		.section	.text.App_Measure_GetFreq,"ax",%progbits
+ 1398              		.align	1
+ 1399              		.global	App_Measure_GetFreq
+ 1400              		.syntax unified
+ 1401              		.thumb
+ 1402              		.thumb_func
+ 1404              	App_Measure_GetFreq:
+ 1405              	.LFB256:
+ 324:User_App/app_measure.c **** 
+ 325:User_App/app_measure.c **** uint32_t App_Measure_GetFreq(void)
+ 326:User_App/app_measure.c **** {
+ 1406              		.loc 1 326 1 is_stmt 1 view -0
+ 1407              		.cfi_startproc
+ 1408              		@ args = 0, pretend = 0, frame = 0
+ 1409              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1410              		@ link register save eliminated.
+ 327:User_App/app_measure.c ****     return s_freq_hz;
+ 1411              		.loc 1 327 5 view .LVU406
+ 328:User_App/app_measure.c **** }
+ 1412              		.loc 1 328 1 is_stmt 0 view .LVU407
+ 1413 0000 014B     		ldr	r3, .L141
+ 1414 0002 1868     		ldr	r0, [r3]
+ 1415 0004 7047     		bx	lr
+ 1416              	.L142:
+ 1417 0006 00BF     		.align	2
+ 1418              	.L141:
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 35
+
+
+ 1419 0008 00000000 		.word	.LANCHOR8
+ 1420              		.cfi_endproc
+ 1421              	.LFE256:
+ 1423              		.section	.text.App_Measure_GetResult,"ax",%progbits
+ 1424              		.align	1
+ 1425              		.global	App_Measure_GetResult
+ 1426              		.syntax unified
+ 1427              		.thumb
+ 1428              		.thumb_func
+ 1430              	App_Measure_GetResult:
+ 1431              	.LVL124:
+ 1432              	.LFB257:
+ 329:User_App/app_measure.c **** 
+ 330:User_App/app_measure.c **** uint8_t App_Measure_GetResult(MeasureResult_t *out)
+ 331:User_App/app_measure.c **** {
+ 1433              		.loc 1 331 1 is_stmt 1 view -0
+ 1434              		.cfi_startproc
+ 1435              		@ args = 0, pretend = 0, frame = 0
+ 1436              		@ frame_needed = 0, uses_anonymous_args = 0
+ 332:User_App/app_measure.c ****     uint8_t ok = 0u;
+ 1437              		.loc 1 332 5 view .LVU409
+ 333:User_App/app_measure.c **** 
+ 334:User_App/app_measure.c ****     if (out == NULL) {
+ 1438              		.loc 1 334 5 view .LVU410
+ 1439              		.loc 1 334 8 is_stmt 0 view .LVU411
+ 1440 0000 28B3     		cbz	r0, .L146
+ 331:User_App/app_measure.c ****     uint8_t ok = 0u;
+ 1441              		.loc 1 331 1 view .LVU412
+ 1442 0002 38B5     		push	{r3, r4, r5, lr}
+ 1443              	.LCFI17:
+ 1444              		.cfi_def_cfa_offset 16
+ 1445              		.cfi_offset 3, -16
+ 1446              		.cfi_offset 4, -12
+ 1447              		.cfi_offset 5, -8
+ 1448              		.cfi_offset 14, -4
+ 1449 0004 0446     		mov	r4, r0
+ 335:User_App/app_measure.c ****         return 0u;
+ 336:User_App/app_measure.c ****     }
+ 337:User_App/app_measure.c **** 
+ 338:User_App/app_measure.c ****     if (osMutexAcquire(Mutex_ResultHandle, 20u) == osOK) {
+ 1450              		.loc 1 338 5 is_stmt 1 view .LVU413
+ 1451              		.loc 1 338 9 is_stmt 0 view .LVU414
+ 1452 0006 1421     		movs	r1, #20
+ 1453 0008 124B     		ldr	r3, .L153
+ 1454 000a 1868     		ldr	r0, [r3]
+ 1455              	.LVL125:
+ 1456              		.loc 1 338 9 view .LVU415
+ 1457 000c FFF7FEFF 		bl	osMutexAcquire
+ 1458              	.LVL126:
+ 1459              		.loc 1 338 8 view .LVU416
+ 1460 0010 08B1     		cbz	r0, .L152
+ 332:User_App/app_measure.c **** 
+ 1461              		.loc 1 332 13 view .LVU417
+ 1462 0012 0020     		movs	r0, #0
+ 1463              	.LVL127:
+ 1464              	.L144:
+ 339:User_App/app_measure.c ****         memcpy(out, &s_result, sizeof(MeasureResult_t));
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 36
+
+
+ 340:User_App/app_measure.c ****         osMutexRelease(Mutex_ResultHandle);
+ 341:User_App/app_measure.c ****         ok = 1u;
+ 342:User_App/app_measure.c ****     }
+ 343:User_App/app_measure.c **** 
+ 344:User_App/app_measure.c ****     return ok;
+ 345:User_App/app_measure.c **** }
+ 1465              		.loc 1 345 1 view .LVU418
+ 1466 0014 38BD     		pop	{r3, r4, r5, pc}
+ 1467              	.LVL128:
+ 1468              	.L152:
+ 339:User_App/app_measure.c ****         memcpy(out, &s_result, sizeof(MeasureResult_t));
+ 1469              		.loc 1 339 9 is_stmt 1 view .LVU419
+ 1470 0016 104D     		ldr	r5, .L153+4
+ 1471 0018 A446     		mov	ip, r4
+ 1472 001a 05F1200E 		add	lr, r5, #32
+ 1473              	.LVL129:
+ 1474              	.L145:
+ 339:User_App/app_measure.c ****         memcpy(out, &s_result, sizeof(MeasureResult_t));
+ 1475              		.loc 1 339 9 is_stmt 0 view .LVU420
+ 1476 001e 2C46     		mov	r4, r5
+ 1477 0020 0FCC     		ldmia	r4!, {r0, r1, r2, r3}
+ 1478 0022 CCF80000 		str	r0, [ip]	@ unaligned
+ 1479 0026 CCF80410 		str	r1, [ip, #4]	@ unaligned
+ 1480 002a CCF80820 		str	r2, [ip, #8]	@ unaligned
+ 1481 002e CCF80C30 		str	r3, [ip, #12]	@ unaligned
+ 1482 0032 2546     		mov	r5, r4
+ 1483 0034 0CF1100C 		add	ip, ip, #16
+ 1484 0038 7445     		cmp	r4, lr
+ 1485 003a F0D1     		bne	.L145
+ 1486 003c 2068     		ldr	r0, [r4]
+ 1487 003e CCF80000 		str	r0, [ip]	@ unaligned
+ 340:User_App/app_measure.c ****         ok = 1u;
+ 1488              		.loc 1 340 9 is_stmt 1 view .LVU421
+ 1489 0042 044B     		ldr	r3, .L153
+ 1490 0044 1868     		ldr	r0, [r3]
+ 1491 0046 FFF7FEFF 		bl	osMutexRelease
+ 1492              	.LVL130:
+ 341:User_App/app_measure.c ****     }
+ 1493              		.loc 1 341 9 view .LVU422
+ 341:User_App/app_measure.c ****     }
+ 1494              		.loc 1 341 12 is_stmt 0 view .LVU423
+ 1495 004a 0120     		movs	r0, #1
+ 1496 004c E2E7     		b	.L144
+ 1497              	.LVL131:
+ 1498              	.L146:
+ 1499              	.LCFI18:
+ 1500              		.cfi_def_cfa_offset 0
+ 1501              		.cfi_restore 3
+ 1502              		.cfi_restore 4
+ 1503              		.cfi_restore 5
+ 1504              		.cfi_restore 14
+ 335:User_App/app_measure.c ****     }
+ 1505              		.loc 1 335 16 view .LVU424
+ 1506 004e 0020     		movs	r0, #0
+ 1507              	.LVL132:
+ 1508              		.loc 1 345 1 view .LVU425
+ 1509 0050 7047     		bx	lr
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 37
+
+
+ 1510              	.L154:
+ 1511 0052 00BF     		.align	2
+ 1512              	.L153:
+ 1513 0054 00000000 		.word	Mutex_ResultHandle
+ 1514 0058 00000000 		.word	.LANCHOR7
+ 1515              		.cfi_endproc
+ 1516              	.LFE257:
+ 1518              		.section	.text.App_Measure_GetBatVoltage,"ax",%progbits
+ 1519              		.align	1
+ 1520              		.global	App_Measure_GetBatVoltage
+ 1521              		.syntax unified
+ 1522              		.thumb
+ 1523              		.thumb_func
+ 1525              	App_Measure_GetBatVoltage:
+ 1526              	.LFB258:
+ 346:User_App/app_measure.c **** 
+ 347:User_App/app_measure.c **** float App_Measure_GetBatVoltage(void)
+ 348:User_App/app_measure.c **** {
+ 1527              		.loc 1 348 1 is_stmt 1 view -0
+ 1528              		.cfi_startproc
+ 1529              		@ args = 0, pretend = 0, frame = 0
+ 1530              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1531 0000 08B5     		push	{r3, lr}
+ 1532              	.LCFI19:
+ 1533              		.cfi_def_cfa_offset 8
+ 1534              		.cfi_offset 3, -8
+ 1535              		.cfi_offset 14, -4
+ 1536 0002 2DED028B 		vpush.64	{d8}
+ 1537              	.LCFI20:
+ 1538              		.cfi_def_cfa_offset 16
+ 1539              		.cfi_offset 80, -16
+ 1540              		.cfi_offset 81, -12
+ 349:User_App/app_measure.c ****     float vbat = 0.0f;
+ 1541              		.loc 1 349 5 view .LVU427
+ 1542              	.LVL133:
+ 350:User_App/app_measure.c **** 
+ 351:User_App/app_measure.c ****     if (HAL_ADC_Start(&hadc2) == HAL_OK) {
+ 1543              		.loc 1 351 5 view .LVU428
+ 1544              		.loc 1 351 9 is_stmt 0 view .LVU429
+ 1545 0006 1548     		ldr	r0, .L163
+ 1546 0008 FFF7FEFF 		bl	HAL_ADC_Start
+ 1547              	.LVL134:
+ 1548              		.loc 1 351 8 view .LVU430
+ 1549 000c 30B1     		cbz	r0, .L161
+ 349:User_App/app_measure.c ****     float vbat = 0.0f;
+ 1550              		.loc 1 349 11 view .LVU431
+ 1551 000e 9FED148A 		vldr.32	s16, .L163+4
+ 352:User_App/app_measure.c ****         if (HAL_ADC_PollForConversion(&hadc2, 10u) == HAL_OK) {
+ 353:User_App/app_measure.c ****             uint16_t raw = (uint16_t)HAL_ADC_GetValue(&hadc2);
+ 354:User_App/app_measure.c ****             float v_pa2 = ((float)raw / ADC_FULL_SCALE) * ADC_VREF;
+ 355:User_App/app_measure.c ****             vbat = v_pa2 / VBAT_DIV_RATIO;
+ 356:User_App/app_measure.c ****         }
+ 357:User_App/app_measure.c ****         (void)HAL_ADC_Stop(&hadc2);
+ 358:User_App/app_measure.c ****     }
+ 359:User_App/app_measure.c **** 
+ 360:User_App/app_measure.c ****     return vbat;
+ 1552              		.loc 1 360 5 is_stmt 1 view .LVU432
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 38
+
+
+ 1553              	.LVL135:
+ 1554              	.L155:
+ 361:User_App/app_measure.c **** }
+ 1555              		.loc 1 361 1 is_stmt 0 view .LVU433
+ 1556 0012 B0EE480A 		vmov.f32	s0, s16
+ 1557 0016 BDEC028B 		vldm	sp!, {d8}
+ 1558              	.LCFI21:
+ 1559              		.cfi_remember_state
+ 1560              		.cfi_restore 80
+ 1561              		.cfi_restore 81
+ 1562              		.cfi_def_cfa_offset 8
+ 1563 001a 08BD     		pop	{r3, pc}
+ 1564              	.LVL136:
+ 1565              	.L161:
+ 1566              	.LCFI22:
+ 1567              		.cfi_restore_state
+ 352:User_App/app_measure.c ****         if (HAL_ADC_PollForConversion(&hadc2, 10u) == HAL_OK) {
+ 1568              		.loc 1 352 9 is_stmt 1 view .LVU434
+ 352:User_App/app_measure.c ****         if (HAL_ADC_PollForConversion(&hadc2, 10u) == HAL_OK) {
+ 1569              		.loc 1 352 13 is_stmt 0 view .LVU435
+ 1570 001c 0A21     		movs	r1, #10
+ 1571 001e 0F48     		ldr	r0, .L163
+ 1572 0020 FFF7FEFF 		bl	HAL_ADC_PollForConversion
+ 1573              	.LVL137:
+ 352:User_App/app_measure.c ****         if (HAL_ADC_PollForConversion(&hadc2, 10u) == HAL_OK) {
+ 1574              		.loc 1 352 12 view .LVU436
+ 1575 0024 28B1     		cbz	r0, .L162
+ 349:User_App/app_measure.c **** 
+ 1576              		.loc 1 349 11 view .LVU437
+ 1577 0026 9FED0E8A 		vldr.32	s16, .L163+4
+ 1578              	.LVL138:
+ 1579              	.L157:
+ 357:User_App/app_measure.c ****     }
+ 1580              		.loc 1 357 9 is_stmt 1 view .LVU438
+ 357:User_App/app_measure.c ****     }
+ 1581              		.loc 1 357 15 is_stmt 0 view .LVU439
+ 1582 002a 0C48     		ldr	r0, .L163
+ 1583 002c FFF7FEFF 		bl	HAL_ADC_Stop
+ 1584              	.LVL139:
+ 1585 0030 EFE7     		b	.L155
+ 1586              	.LVL140:
+ 1587              	.L162:
+ 1588              	.LBB11:
+ 353:User_App/app_measure.c ****             float v_pa2 = ((float)raw / ADC_FULL_SCALE) * ADC_VREF;
+ 1589              		.loc 1 353 13 is_stmt 1 view .LVU440
+ 353:User_App/app_measure.c ****             float v_pa2 = ((float)raw / ADC_FULL_SCALE) * ADC_VREF;
+ 1590              		.loc 1 353 38 is_stmt 0 view .LVU441
+ 1591 0032 0A48     		ldr	r0, .L163
+ 1592 0034 FFF7FEFF 		bl	HAL_ADC_GetValue
+ 1593              	.LVL141:
+ 353:User_App/app_measure.c ****             float v_pa2 = ((float)raw / ADC_FULL_SCALE) * ADC_VREF;
+ 1594              		.loc 1 353 22 view .LVU442
+ 1595 0038 80B2     		uxth	r0, r0
+ 1596              	.LVL142:
+ 354:User_App/app_measure.c ****             vbat = v_pa2 / VBAT_DIV_RATIO;
+ 1597              		.loc 1 354 13 is_stmt 1 view .LVU443
+ 354:User_App/app_measure.c ****             vbat = v_pa2 / VBAT_DIV_RATIO;
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 39
+
+
+ 1598              		.loc 1 354 28 is_stmt 0 view .LVU444
+ 1599 003a 07EE900A 		vmov	s15, r0	@ int
+ 1600 003e F8EE677A 		vcvt.f32.u32	s15, s15
+ 354:User_App/app_measure.c ****             vbat = v_pa2 / VBAT_DIV_RATIO;
+ 1601              		.loc 1 354 39 view .LVU445
+ 1602 0042 DFED086A 		vldr.32	s13, .L163+8
+ 1603 0046 87EEA67A 		vdiv.f32	s14, s15, s13
+ 354:User_App/app_measure.c ****             vbat = v_pa2 / VBAT_DIV_RATIO;
+ 1604              		.loc 1 354 19 view .LVU446
+ 1605 004a DFED077A 		vldr.32	s15, .L163+12
+ 1606 004e 67EE277A 		vmul.f32	s15, s14, s15
+ 1607              	.LVL143:
+ 355:User_App/app_measure.c ****         }
+ 1608              		.loc 1 355 13 is_stmt 1 view .LVU447
+ 355:User_App/app_measure.c ****         }
+ 1609              		.loc 1 355 18 is_stmt 0 view .LVU448
+ 1610 0052 9FED067A 		vldr.32	s14, .L163+16
+ 1611 0056 87EE878A 		vdiv.f32	s16, s15, s14
+ 1612              	.LVL144:
+ 355:User_App/app_measure.c ****         }
+ 1613              		.loc 1 355 18 view .LVU449
+ 1614 005a E6E7     		b	.L157
+ 1615              	.L164:
+ 1616              		.align	2
+ 1617              	.L163:
+ 1618 005c 00000000 		.word	hadc2
+ 1619 0060 00000000 		.word	0
+ 1620 0064 00F07F45 		.word	1166012416
+ 1621 0068 33335340 		.word	1079194419
+ 1622 006c 78F4CA3D 		.word	1036711032
+ 1623              	.LBE11:
+ 1624              		.cfi_endproc
+ 1625              	.LFE258:
+ 1627              		.section	.text.App_Measure_Run,"ax",%progbits
+ 1628              		.align	1
+ 1629              		.global	App_Measure_Run
+ 1630              		.syntax unified
+ 1631              		.thumb
+ 1632              		.thumb_func
+ 1634              	App_Measure_Run:
+ 1635              	.LFB259:
+ 362:User_App/app_measure.c **** 
+ 363:User_App/app_measure.c **** void App_Measure_Run(void)
+ 364:User_App/app_measure.c **** {
+ 1636              		.loc 1 364 1 is_stmt 1 view -0
+ 1637              		.cfi_startproc
+ 1638              		@ args = 0, pretend = 0, frame = 0
+ 1639              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1640 0000 08B5     		push	{r3, lr}
+ 1641              	.LCFI23:
+ 1642              		.cfi_def_cfa_offset 8
+ 1643              		.cfi_offset 3, -8
+ 1644              		.cfi_offset 14, -4
+ 365:User_App/app_measure.c ****     s_wait_ticks++;
+ 1645              		.loc 1 365 5 view .LVU451
+ 1646              		.loc 1 365 17 is_stmt 0 view .LVU452
+ 1647 0002 4D4A     		ldr	r2, .L178
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 40
+
+
+ 1648 0004 1368     		ldr	r3, [r2]
+ 1649 0006 0133     		adds	r3, r3, #1
+ 1650 0008 1360     		str	r3, [r2]
+ 366:User_App/app_measure.c **** 
+ 367:User_App/app_measure.c ****     switch (s_state) {
+ 1651              		.loc 1 367 5 is_stmt 1 view .LVU453
+ 1652 000a 4C4B     		ldr	r3, .L178+4
+ 1653 000c 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 1654 000e 052B     		cmp	r3, #5
+ 1655 0010 00F28F80 		bhi	.L166
+ 1656 0014 DFE803F0 		tbb	[pc, r3]
+ 1657              	.L168:
+ 1658 0018 03       		.byte	(.L173-.L168)/2
+ 1659 0019 11       		.byte	(.L172-.L168)/2
+ 1660 001a 2C       		.byte	(.L171-.L168)/2
+ 1661 001b 47       		.byte	(.L170-.L168)/2
+ 1662 001c 62       		.byte	(.L169-.L168)/2
+ 1663 001d 79       		.byte	(.L167-.L168)/2
+ 1664              		.p2align 1
+ 1665              	.L173:
+ 368:User_App/app_measure.c ****     case STATE_INIT:
+ 369:User_App/app_measure.c ****         BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UX, PHASE_0DEG);
+ 1666              		.loc 1 369 9 view .LVU454
+ 1667 001e 0021     		movs	r1, #0
+ 1668 0020 0846     		mov	r0, r1
+ 1669 0022 FFF7FEFF 		bl	BSP_AFE_SetMeasureChannel
+ 1670              	.LVL145:
+ 370:User_App/app_measure.c ****         s_wait_ticks = 0u;
+ 1671              		.loc 1 370 9 view .LVU455
+ 1672              		.loc 1 370 22 is_stmt 0 view .LVU456
+ 1673 0026 444B     		ldr	r3, .L178
+ 1674 0028 0022     		movs	r2, #0
+ 1675 002a 1A60     		str	r2, [r3]
+ 371:User_App/app_measure.c ****         s_state = STATE_SAMPLE_V1;
+ 1676              		.loc 1 371 9 is_stmt 1 view .LVU457
+ 1677              		.loc 1 371 17 is_stmt 0 view .LVU458
+ 1678 002c 434B     		ldr	r3, .L178+4
+ 1679 002e 0122     		movs	r2, #1
+ 1680 0030 1A70     		strb	r2, [r3]
+ 372:User_App/app_measure.c ****         break;
+ 1681              		.loc 1 372 9 is_stmt 1 view .LVU459
+ 1682              	.L174:
+ 373:User_App/app_measure.c **** 
+ 374:User_App/app_measure.c ****     case STATE_SAMPLE_V1:
+ 375:User_App/app_measure.c ****         s_iq_data[0] = App_Measure_FilterUpdate(&s_filter[0], App_Measure_AdcSample());
+ 376:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V1_TICKS) {
+ 377:User_App/app_measure.c ****             s_iq_data[0] = s_filter[0].y2;
+ 378:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UX, PHASE_90DEG);
+ 379:User_App/app_measure.c ****             s_wait_ticks = 0u;
+ 380:User_App/app_measure.c ****             s_state = STATE_SAMPLE_V2;
+ 381:User_App/app_measure.c ****         }
+ 382:User_App/app_measure.c ****         break;
+ 383:User_App/app_measure.c **** 
+ 384:User_App/app_measure.c ****     case STATE_SAMPLE_V2:
+ 385:User_App/app_measure.c ****         s_iq_data[1] = App_Measure_FilterUpdate(&s_filter[1], App_Measure_AdcSample());
+ 386:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V2_TICKS) {
+ 387:User_App/app_measure.c ****             s_iq_data[1] = s_filter[1].y2;
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 41
+
+
+ 388:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UR, PHASE_90DEG);
+ 389:User_App/app_measure.c ****             s_wait_ticks = 0u;
+ 390:User_App/app_measure.c ****             s_state = STATE_SAMPLE_V3;
+ 391:User_App/app_measure.c ****         }
+ 392:User_App/app_measure.c ****         break;
+ 393:User_App/app_measure.c **** 
+ 394:User_App/app_measure.c ****     case STATE_SAMPLE_V3:
+ 395:User_App/app_measure.c ****         s_iq_data[3] = App_Measure_FilterUpdate(&s_filter[3], App_Measure_AdcSample());
+ 396:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V3_TICKS) {
+ 397:User_App/app_measure.c ****             s_iq_data[3] = s_filter[3].y2;
+ 398:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UR, PHASE_0DEG);
+ 399:User_App/app_measure.c ****             s_wait_ticks = 0u;
+ 400:User_App/app_measure.c ****             s_state = STATE_SAMPLE_I;
+ 401:User_App/app_measure.c ****         }
+ 402:User_App/app_measure.c ****         break;
+ 403:User_App/app_measure.c **** 
+ 404:User_App/app_measure.c ****     case STATE_SAMPLE_I:
+ 405:User_App/app_measure.c ****         s_iq_data[2] = App_Measure_FilterUpdate(&s_filter[2], App_Measure_AdcSample());
+ 406:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_I_TICKS) {
+ 407:User_App/app_measure.c ****             s_iq_data[2] = s_filter[2].y2;
+ 408:User_App/app_measure.c ****             s_wait_ticks = 0u;
+ 409:User_App/app_measure.c ****             s_state = STATE_CALCULATE;
+ 410:User_App/app_measure.c ****         }
+ 411:User_App/app_measure.c ****         break;
+ 412:User_App/app_measure.c **** 
+ 413:User_App/app_measure.c ****     case STATE_CALCULATE:
+ 414:User_App/app_measure.c ****         if (App_Measure_AutoRange() == 0u) {
+ 415:User_App/app_measure.c ****             if (osMutexAcquire(Mutex_ResultHandle, 10u) == osOK) {
+ 416:User_App/app_measure.c ****                 App_Measure_CalcImpedance();
+ 417:User_App/app_measure.c ****                 osMutexRelease(Mutex_ResultHandle);
+ 418:User_App/app_measure.c ****             }
+ 419:User_App/app_measure.c ****             App_Measure_ResetStateMachine();
+ 420:User_App/app_measure.c ****         }
+ 421:User_App/app_measure.c ****         break;
+ 422:User_App/app_measure.c **** 
+ 423:User_App/app_measure.c ****     default:
+ 424:User_App/app_measure.c ****         App_Measure_ResetStateMachine();
+ 425:User_App/app_measure.c ****         break;
+ 426:User_App/app_measure.c ****     }
+ 427:User_App/app_measure.c **** 
+ 428:User_App/app_measure.c ****     osDelay(TASK_PERIOD_MS);
+ 1683              		.loc 1 428 5 view .LVU460
+ 1684 0032 0A20     		movs	r0, #10
+ 1685 0034 FFF7FEFF 		bl	osDelay
+ 1686              	.LVL146:
+ 429:User_App/app_measure.c **** }
+ 1687              		.loc 1 429 1 is_stmt 0 view .LVU461
+ 1688 0038 08BD     		pop	{r3, pc}
+ 1689              	.L172:
+ 375:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V1_TICKS) {
+ 1690              		.loc 1 375 9 is_stmt 1 view .LVU462
+ 375:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V1_TICKS) {
+ 1691              		.loc 1 375 24 is_stmt 0 view .LVU463
+ 1692 003a FFF7FEFF 		bl	App_Measure_AdcSample
+ 1693              	.LVL147:
+ 1694 003e 4048     		ldr	r0, .L178+8
+ 1695 0040 FFF7FEFF 		bl	App_Measure_FilterUpdate
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 42
+
+
+ 1696              	.LVL148:
+ 375:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V1_TICKS) {
+ 1697              		.loc 1 375 22 view .LVU464
+ 1698 0044 3F4B     		ldr	r3, .L178+12
+ 1699 0046 83ED000A 		vstr.32	s0, [r3]
+ 376:User_App/app_measure.c ****             s_iq_data[0] = s_filter[0].y2;
+ 1700              		.loc 1 376 9 is_stmt 1 view .LVU465
+ 376:User_App/app_measure.c ****             s_iq_data[0] = s_filter[0].y2;
+ 1701              		.loc 1 376 26 is_stmt 0 view .LVU466
+ 1702 004a 3B4B     		ldr	r3, .L178
+ 1703 004c 1B68     		ldr	r3, [r3]
+ 376:User_App/app_measure.c ****             s_iq_data[0] = s_filter[0].y2;
+ 1704              		.loc 1 376 12 view .LVU467
+ 1705 004e 1D2B     		cmp	r3, #29
+ 1706 0050 EFD9     		bls	.L174
+ 377:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UX, PHASE_90DEG);
+ 1707              		.loc 1 377 13 is_stmt 1 view .LVU468
+ 377:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UX, PHASE_90DEG);
+ 1708              		.loc 1 377 39 is_stmt 0 view .LVU469
+ 1709 0052 3B4B     		ldr	r3, .L178+8
+ 1710 0054 5A68     		ldr	r2, [r3, #4]	@ float
+ 377:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UX, PHASE_90DEG);
+ 1711              		.loc 1 377 26 view .LVU470
+ 1712 0056 3B4B     		ldr	r3, .L178+12
+ 1713 0058 1A60     		str	r2, [r3]	@ float
+ 378:User_App/app_measure.c ****             s_wait_ticks = 0u;
+ 1714              		.loc 1 378 13 is_stmt 1 view .LVU471
+ 1715 005a 0121     		movs	r1, #1
+ 1716 005c 0020     		movs	r0, #0
+ 1717 005e FFF7FEFF 		bl	BSP_AFE_SetMeasureChannel
+ 1718              	.LVL149:
+ 379:User_App/app_measure.c ****             s_state = STATE_SAMPLE_V2;
+ 1719              		.loc 1 379 13 view .LVU472
+ 379:User_App/app_measure.c ****             s_state = STATE_SAMPLE_V2;
+ 1720              		.loc 1 379 26 is_stmt 0 view .LVU473
+ 1721 0062 354B     		ldr	r3, .L178
+ 1722 0064 0022     		movs	r2, #0
+ 1723 0066 1A60     		str	r2, [r3]
+ 380:User_App/app_measure.c ****         }
+ 1724              		.loc 1 380 13 is_stmt 1 view .LVU474
+ 380:User_App/app_measure.c ****         }
+ 1725              		.loc 1 380 21 is_stmt 0 view .LVU475
+ 1726 0068 344B     		ldr	r3, .L178+4
+ 1727 006a 0222     		movs	r2, #2
+ 1728 006c 1A70     		strb	r2, [r3]
+ 1729 006e E0E7     		b	.L174
+ 1730              	.L171:
+ 385:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V2_TICKS) {
+ 1731              		.loc 1 385 9 is_stmt 1 view .LVU476
+ 385:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V2_TICKS) {
+ 1732              		.loc 1 385 24 is_stmt 0 view .LVU477
+ 1733 0070 FFF7FEFF 		bl	App_Measure_AdcSample
+ 1734              	.LVL150:
+ 1735 0074 3448     		ldr	r0, .L178+16
+ 1736 0076 FFF7FEFF 		bl	App_Measure_FilterUpdate
+ 1737              	.LVL151:
+ 385:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V2_TICKS) {
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 43
+
+
+ 1738              		.loc 1 385 22 view .LVU478
+ 1739 007a 324B     		ldr	r3, .L178+12
+ 1740 007c 83ED010A 		vstr.32	s0, [r3, #4]
+ 386:User_App/app_measure.c ****             s_iq_data[1] = s_filter[1].y2;
+ 1741              		.loc 1 386 9 is_stmt 1 view .LVU479
+ 386:User_App/app_measure.c ****             s_iq_data[1] = s_filter[1].y2;
+ 1742              		.loc 1 386 26 is_stmt 0 view .LVU480
+ 1743 0080 2D4B     		ldr	r3, .L178
+ 1744 0082 1B68     		ldr	r3, [r3]
+ 386:User_App/app_measure.c ****             s_iq_data[1] = s_filter[1].y2;
+ 1745              		.loc 1 386 12 view .LVU481
+ 1746 0084 1D2B     		cmp	r3, #29
+ 1747 0086 D4D9     		bls	.L174
+ 387:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UR, PHASE_90DEG);
+ 1748              		.loc 1 387 13 is_stmt 1 view .LVU482
+ 387:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UR, PHASE_90DEG);
+ 1749              		.loc 1 387 39 is_stmt 0 view .LVU483
+ 1750 0088 2D4B     		ldr	r3, .L178+8
+ 1751 008a 9A69     		ldr	r2, [r3, #24]	@ float
+ 387:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UR, PHASE_90DEG);
+ 1752              		.loc 1 387 26 view .LVU484
+ 1753 008c 2D4B     		ldr	r3, .L178+12
+ 1754 008e 5A60     		str	r2, [r3, #4]	@ float
+ 388:User_App/app_measure.c ****             s_wait_ticks = 0u;
+ 1755              		.loc 1 388 13 is_stmt 1 view .LVU485
+ 1756 0090 0121     		movs	r1, #1
+ 1757 0092 0846     		mov	r0, r1
+ 1758 0094 FFF7FEFF 		bl	BSP_AFE_SetMeasureChannel
+ 1759              	.LVL152:
+ 389:User_App/app_measure.c ****             s_state = STATE_SAMPLE_V3;
+ 1760              		.loc 1 389 13 view .LVU486
+ 389:User_App/app_measure.c ****             s_state = STATE_SAMPLE_V3;
+ 1761              		.loc 1 389 26 is_stmt 0 view .LVU487
+ 1762 0098 274B     		ldr	r3, .L178
+ 1763 009a 0022     		movs	r2, #0
+ 1764 009c 1A60     		str	r2, [r3]
+ 390:User_App/app_measure.c ****         }
+ 1765              		.loc 1 390 13 is_stmt 1 view .LVU488
+ 390:User_App/app_measure.c ****         }
+ 1766              		.loc 1 390 21 is_stmt 0 view .LVU489
+ 1767 009e 274B     		ldr	r3, .L178+4
+ 1768 00a0 0322     		movs	r2, #3
+ 1769 00a2 1A70     		strb	r2, [r3]
+ 1770 00a4 C5E7     		b	.L174
+ 1771              	.L170:
+ 395:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V3_TICKS) {
+ 1772              		.loc 1 395 9 is_stmt 1 view .LVU490
+ 395:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V3_TICKS) {
+ 1773              		.loc 1 395 24 is_stmt 0 view .LVU491
+ 1774 00a6 FFF7FEFF 		bl	App_Measure_AdcSample
+ 1775              	.LVL153:
+ 1776 00aa 2848     		ldr	r0, .L178+20
+ 1777 00ac FFF7FEFF 		bl	App_Measure_FilterUpdate
+ 1778              	.LVL154:
+ 395:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_V3_TICKS) {
+ 1779              		.loc 1 395 22 view .LVU492
+ 1780 00b0 244B     		ldr	r3, .L178+12
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 44
+
+
+ 1781 00b2 83ED030A 		vstr.32	s0, [r3, #12]
+ 396:User_App/app_measure.c ****             s_iq_data[3] = s_filter[3].y2;
+ 1782              		.loc 1 396 9 is_stmt 1 view .LVU493
+ 396:User_App/app_measure.c ****             s_iq_data[3] = s_filter[3].y2;
+ 1783              		.loc 1 396 26 is_stmt 0 view .LVU494
+ 1784 00b6 204B     		ldr	r3, .L178
+ 1785 00b8 1B68     		ldr	r3, [r3]
+ 396:User_App/app_measure.c ****             s_iq_data[3] = s_filter[3].y2;
+ 1786              		.loc 1 396 12 view .LVU495
+ 1787 00ba 1D2B     		cmp	r3, #29
+ 1788 00bc B9D9     		bls	.L174
+ 397:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UR, PHASE_0DEG);
+ 1789              		.loc 1 397 13 is_stmt 1 view .LVU496
+ 397:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UR, PHASE_0DEG);
+ 1790              		.loc 1 397 39 is_stmt 0 view .LVU497
+ 1791 00be 204B     		ldr	r3, .L178+8
+ 1792 00c0 1A6C     		ldr	r2, [r3, #64]	@ float
+ 397:User_App/app_measure.c ****             BSP_AFE_SetMeasureChannel(SIG_CHANNEL_UR, PHASE_0DEG);
+ 1793              		.loc 1 397 26 view .LVU498
+ 1794 00c2 204B     		ldr	r3, .L178+12
+ 1795 00c4 DA60     		str	r2, [r3, #12]	@ float
+ 398:User_App/app_measure.c ****             s_wait_ticks = 0u;
+ 1796              		.loc 1 398 13 is_stmt 1 view .LVU499
+ 1797 00c6 0021     		movs	r1, #0
+ 1798 00c8 0120     		movs	r0, #1
+ 1799 00ca FFF7FEFF 		bl	BSP_AFE_SetMeasureChannel
+ 1800              	.LVL155:
+ 399:User_App/app_measure.c ****             s_state = STATE_SAMPLE_I;
+ 1801              		.loc 1 399 13 view .LVU500
+ 399:User_App/app_measure.c ****             s_state = STATE_SAMPLE_I;
+ 1802              		.loc 1 399 26 is_stmt 0 view .LVU501
+ 1803 00ce 1A4B     		ldr	r3, .L178
+ 1804 00d0 0022     		movs	r2, #0
+ 1805 00d2 1A60     		str	r2, [r3]
+ 400:User_App/app_measure.c ****         }
+ 1806              		.loc 1 400 13 is_stmt 1 view .LVU502
+ 400:User_App/app_measure.c ****         }
+ 1807              		.loc 1 400 21 is_stmt 0 view .LVU503
+ 1808 00d4 194B     		ldr	r3, .L178+4
+ 1809 00d6 0422     		movs	r2, #4
+ 1810 00d8 1A70     		strb	r2, [r3]
+ 1811 00da AAE7     		b	.L174
+ 1812              	.L169:
+ 405:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_I_TICKS) {
+ 1813              		.loc 1 405 9 is_stmt 1 view .LVU504
+ 405:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_I_TICKS) {
+ 1814              		.loc 1 405 24 is_stmt 0 view .LVU505
+ 1815 00dc FFF7FEFF 		bl	App_Measure_AdcSample
+ 1816              	.LVL156:
+ 1817 00e0 1B48     		ldr	r0, .L178+24
+ 1818 00e2 FFF7FEFF 		bl	App_Measure_FilterUpdate
+ 1819              	.LVL157:
+ 405:User_App/app_measure.c ****         if (s_wait_ticks >= WAIT_I_TICKS) {
+ 1820              		.loc 1 405 22 view .LVU506
+ 1821 00e6 174B     		ldr	r3, .L178+12
+ 1822 00e8 83ED020A 		vstr.32	s0, [r3, #8]
+ 406:User_App/app_measure.c ****             s_iq_data[2] = s_filter[2].y2;
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 45
+
+
+ 1823              		.loc 1 406 9 is_stmt 1 view .LVU507
+ 406:User_App/app_measure.c ****             s_iq_data[2] = s_filter[2].y2;
+ 1824              		.loc 1 406 26 is_stmt 0 view .LVU508
+ 1825 00ec 124B     		ldr	r3, .L178
+ 1826 00ee 1B68     		ldr	r3, [r3]
+ 406:User_App/app_measure.c ****             s_iq_data[2] = s_filter[2].y2;
+ 1827              		.loc 1 406 12 view .LVU509
+ 1828 00f0 1D2B     		cmp	r3, #29
+ 1829 00f2 9ED9     		bls	.L174
+ 407:User_App/app_measure.c ****             s_wait_ticks = 0u;
+ 1830              		.loc 1 407 13 is_stmt 1 view .LVU510
+ 407:User_App/app_measure.c ****             s_wait_ticks = 0u;
+ 1831              		.loc 1 407 39 is_stmt 0 view .LVU511
+ 1832 00f4 124B     		ldr	r3, .L178+8
+ 1833 00f6 DA6A     		ldr	r2, [r3, #44]	@ float
+ 407:User_App/app_measure.c ****             s_wait_ticks = 0u;
+ 1834              		.loc 1 407 26 view .LVU512
+ 1835 00f8 124B     		ldr	r3, .L178+12
+ 1836 00fa 9A60     		str	r2, [r3, #8]	@ float
+ 408:User_App/app_measure.c ****             s_state = STATE_CALCULATE;
+ 1837              		.loc 1 408 13 is_stmt 1 view .LVU513
+ 408:User_App/app_measure.c ****             s_state = STATE_CALCULATE;
+ 1838              		.loc 1 408 26 is_stmt 0 view .LVU514
+ 1839 00fc 0E4B     		ldr	r3, .L178
+ 1840 00fe 0022     		movs	r2, #0
+ 1841 0100 1A60     		str	r2, [r3]
+ 409:User_App/app_measure.c ****         }
+ 1842              		.loc 1 409 13 is_stmt 1 view .LVU515
+ 409:User_App/app_measure.c ****         }
+ 1843              		.loc 1 409 21 is_stmt 0 view .LVU516
+ 1844 0102 0E4B     		ldr	r3, .L178+4
+ 1845 0104 0522     		movs	r2, #5
+ 1846 0106 1A70     		strb	r2, [r3]
+ 1847 0108 93E7     		b	.L174
+ 1848              	.L167:
+ 414:User_App/app_measure.c ****             if (osMutexAcquire(Mutex_ResultHandle, 10u) == osOK) {
+ 1849              		.loc 1 414 9 is_stmt 1 view .LVU517
+ 414:User_App/app_measure.c ****             if (osMutexAcquire(Mutex_ResultHandle, 10u) == osOK) {
+ 1850              		.loc 1 414 13 is_stmt 0 view .LVU518
+ 1851 010a FFF7FEFF 		bl	App_Measure_AutoRange
+ 1852              	.LVL158:
+ 414:User_App/app_measure.c ****             if (osMutexAcquire(Mutex_ResultHandle, 10u) == osOK) {
+ 1853              		.loc 1 414 12 view .LVU519
+ 1854 010e 0028     		cmp	r0, #0
+ 1855 0110 8FD1     		bne	.L174
+ 415:User_App/app_measure.c ****                 App_Measure_CalcImpedance();
+ 1856              		.loc 1 415 13 is_stmt 1 view .LVU520
+ 415:User_App/app_measure.c ****                 App_Measure_CalcImpedance();
+ 1857              		.loc 1 415 17 is_stmt 0 view .LVU521
+ 1858 0112 0A21     		movs	r1, #10
+ 1859 0114 0F4B     		ldr	r3, .L178+28
+ 1860 0116 1868     		ldr	r0, [r3]
+ 1861 0118 FFF7FEFF 		bl	osMutexAcquire
+ 1862              	.LVL159:
+ 415:User_App/app_measure.c ****                 App_Measure_CalcImpedance();
+ 1863              		.loc 1 415 16 view .LVU522
+ 1864 011c 10B1     		cbz	r0, .L177
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 46
+
+
+ 1865              	.L175:
+ 419:User_App/app_measure.c ****         }
+ 1866              		.loc 1 419 13 is_stmt 1 view .LVU523
+ 1867 011e FFF7FEFF 		bl	App_Measure_ResetStateMachine
+ 1868              	.LVL160:
+ 1869 0122 86E7     		b	.L174
+ 1870              	.L177:
+ 416:User_App/app_measure.c ****                 osMutexRelease(Mutex_ResultHandle);
+ 1871              		.loc 1 416 17 view .LVU524
+ 1872 0124 FFF7FEFF 		bl	App_Measure_CalcImpedance
+ 1873              	.LVL161:
+ 417:User_App/app_measure.c ****             }
+ 1874              		.loc 1 417 17 view .LVU525
+ 1875 0128 0A4B     		ldr	r3, .L178+28
+ 1876 012a 1868     		ldr	r0, [r3]
+ 1877 012c FFF7FEFF 		bl	osMutexRelease
+ 1878              	.LVL162:
+ 1879 0130 F5E7     		b	.L175
+ 1880              	.L166:
+ 424:User_App/app_measure.c ****         break;
+ 1881              		.loc 1 424 9 view .LVU526
+ 1882 0132 FFF7FEFF 		bl	App_Measure_ResetStateMachine
+ 1883              	.LVL163:
+ 425:User_App/app_measure.c ****     }
+ 1884              		.loc 1 425 9 view .LVU527
+ 1885 0136 7CE7     		b	.L174
+ 1886              	.L179:
+ 1887              		.align	2
+ 1888              	.L178:
+ 1889 0138 00000000 		.word	.LANCHOR1
+ 1890 013c 00000000 		.word	.LANCHOR0
+ 1891 0140 00000000 		.word	.LANCHOR2
+ 1892 0144 00000000 		.word	.LANCHOR6
+ 1893 0148 14000000 		.word	.LANCHOR2+20
+ 1894 014c 3C000000 		.word	.LANCHOR2+60
+ 1895 0150 28000000 		.word	.LANCHOR2+40
+ 1896 0154 00000000 		.word	Mutex_ResultHandle
+ 1897              		.cfi_endproc
+ 1898              	.LFE259:
+ 1900              		.global	g_adc1_dma_buf
+ 1901              		.section	.bss.g_adc1_dma_buf,"aw",%nobits
+ 1902              		.align	2
+ 1903              		.set	.LANCHOR4,. + 0
+ 1906              	g_adc1_dma_buf:
+ 1907 0000 00000000 		.space	32
+ 1907      00000000 
+ 1907      00000000 
+ 1907      00000000 
+ 1907      00000000 
+ 1908              		.section	.bss.s_adc_dma_ok,"aw",%nobits
+ 1909              		.set	.LANCHOR5,. + 0
+ 1912              	s_adc_dma_ok:
+ 1913 0000 00       		.space	1
+ 1914              		.section	.bss.s_filter,"aw",%nobits
+ 1915              		.align	2
+ 1916              		.set	.LANCHOR2,. + 0
+ 1919              	s_filter:
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 47
+
+
+ 1920 0000 00000000 		.space	80
+ 1920      00000000 
+ 1920      00000000 
+ 1920      00000000 
+ 1920      00000000 
+ 1921              		.section	.bss.s_iq_data,"aw",%nobits
+ 1922              		.align	2
+ 1923              		.set	.LANCHOR6,. + 0
+ 1926              	s_iq_data:
+ 1927 0000 00000000 		.space	16
+ 1927      00000000 
+ 1927      00000000 
+ 1927      00000000 
+ 1928              		.section	.bss.s_result,"aw",%nobits
+ 1929              		.align	2
+ 1930              		.set	.LANCHOR7,. + 0
+ 1933              	s_result:
+ 1934 0000 00000000 		.space	36
+ 1934      00000000 
+ 1934      00000000 
+ 1934      00000000 
+ 1934      00000000 
+ 1935              		.section	.bss.s_state,"aw",%nobits
+ 1936              		.set	.LANCHOR0,. + 0
+ 1939              	s_state:
+ 1940 0000 00       		.space	1
+ 1941              		.section	.bss.s_wait_ticks,"aw",%nobits
+ 1942              		.align	2
+ 1943              		.set	.LANCHOR1,. + 0
+ 1946              	s_wait_ticks:
+ 1947 0000 00000000 		.space	4
+ 1948              		.section	.data.s_freq_hz,"aw"
+ 1949              		.align	2
+ 1950              		.set	.LANCHOR8,. + 0
+ 1953              	s_freq_hz:
+ 1954 0000 E8030000 		.word	1000
+ 1955              		.section	.rodata.kFreqList.0,"a"
+ 1956              		.align	2
+ 1957              		.set	.LANCHOR3,. + 0
+ 1960              	kFreqList.0:
+ 1961 0000 64000000 		.word	100
+ 1962 0004 E8030000 		.word	1000
+ 1963 0008 10270000 		.word	10000
+ 1964 000c A0860100 		.word	100000
+ 1965              		.text
+ 1966              	.Letext0:
+ 1967              		.file 2 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\machine\\_default_types.h"
+ 1968              		.file 3 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\sys\\_stdint.h"
+ 1969              		.file 4 "Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h"
+ 1970              		.file 5 "Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f405xx.h"
+ 1971              		.file 6 "Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f4xx.h"
+ 1972              		.file 7 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_def.h"
+ 1973              		.file 8 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_dma.h"
+ 1974              		.file 9 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_adc.h"
+ 1975              		.file 10 "User_BSP/bsp_afe.h"
+ 1976              		.file 11 "User_App/system_data.h"
+ 1977              		.file 12 "User_App/app_measure.h"
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 48
+
+
+ 1978              		.file 13 "Core/Inc/adc.h"
+ 1979              		.file 14 "User_BSP/9834.h"
+ 1980              		.file 15 "User_BSP/bsp_tim4.h"
+ 1981              		.file 16 "d:\\app\\clion-dependency\\gcc-arm\\arm-none-eabi\\include\\math.h"
+ 1982              		.file 17 "<built-in>"
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 49
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 app_measure.c
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:20     .text.App_Measure_ResetStateMachine:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:25     .text.App_Measure_ResetStateMachine:00000000 App_Measure_ResetStateMachine
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:47     .text.App_Measure_ResetStateMachine:0000000c $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:53     .text.App_Measure_FilterInit:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:58     .text.App_Measure_FilterInit:00000000 App_Measure_FilterInit
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:88     .text.App_Measure_FilterUpdate:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:93     .text.App_Measure_FilterUpdate:00000000 App_Measure_FilterUpdate
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:147    .text.App_Measure_FilterResetAll:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:152    .text.App_Measure_FilterResetAll:00000000 App_Measure_FilterResetAll
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:191    .text.App_Measure_FilterResetAll:00000020 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:196    .text.App_Measure_NormalizeFreq:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:201    .text.App_Measure_NormalizeFreq:00000000 App_Measure_NormalizeFreq
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:290    .text.App_Measure_NormalizeFreq:00000040 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:295    .text.App_Measure_FreqToLpf:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:300    .text.App_Measure_FreqToLpf:00000000 App_Measure_FreqToLpf
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:351    .text.App_Measure_PrepareAdcDma:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:356    .text.App_Measure_PrepareAdcDma:00000000 App_Measure_PrepareAdcDma
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:478    .text.App_Measure_PrepareAdcDma:00000080 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:484    .text.App_Measure_ReadAdcPolling:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:489    .text.App_Measure_ReadAdcPolling:00000000 App_Measure_ReadAdcPolling
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:579    .text.App_Measure_ReadAdcPolling:00000058 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:587    .text.App_Measure_AdcSample:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:592    .text.App_Measure_AdcSample:00000000 App_Measure_AdcSample
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:663    .text.App_Measure_AdcSample:00000048 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:671    .text.App_Measure_AutoRange:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:676    .text.App_Measure_AutoRange:00000000 App_Measure_AutoRange
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:854    .text.App_Measure_AutoRange:000000a8 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:863    .text.App_Measure_CalcImpedance:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:868    .text.App_Measure_CalcImpedance:00000000 App_Measure_CalcImpedance
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1212   .text.App_Measure_CalcImpedance:00000214 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1226   .text.App_Measure_SetFreq:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1232   .text.App_Measure_SetFreq:00000000 App_Measure_SetFreq
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1292   .text.App_Measure_SetFreq:0000003c $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1299   .text.App_Measure_Init:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1305   .text.App_Measure_Init:00000000 App_Measure_Init
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1388   .text.App_Measure_Init:00000064 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1398   .text.App_Measure_GetFreq:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1404   .text.App_Measure_GetFreq:00000000 App_Measure_GetFreq
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1419   .text.App_Measure_GetFreq:00000008 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1424   .text.App_Measure_GetResult:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1430   .text.App_Measure_GetResult:00000000 App_Measure_GetResult
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1513   .text.App_Measure_GetResult:00000054 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1519   .text.App_Measure_GetBatVoltage:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1525   .text.App_Measure_GetBatVoltage:00000000 App_Measure_GetBatVoltage
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1618   .text.App_Measure_GetBatVoltage:0000005c $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1628   .text.App_Measure_Run:00000000 $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1634   .text.App_Measure_Run:00000000 App_Measure_Run
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1658   .text.App_Measure_Run:00000018 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1664   .text.App_Measure_Run:0000001e $t
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1889   .text.App_Measure_Run:00000138 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1906   .bss.g_adc1_dma_buf:00000000 g_adc1_dma_buf
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1902   .bss.g_adc1_dma_buf:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1912   .bss.s_adc_dma_ok:00000000 s_adc_dma_ok
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1913   .bss.s_adc_dma_ok:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1915   .bss.s_filter:00000000 $d
+ARM GAS  C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s 			page 50
+
+
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1919   .bss.s_filter:00000000 s_filter
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1922   .bss.s_iq_data:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1926   .bss.s_iq_data:00000000 s_iq_data
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1929   .bss.s_result:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1933   .bss.s_result:00000000 s_result
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1939   .bss.s_state:00000000 s_state
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1940   .bss.s_state:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1942   .bss.s_wait_ticks:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1946   .bss.s_wait_ticks:00000000 s_wait_ticks
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1949   .data.s_freq_hz:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1953   .data.s_freq_hz:00000000 s_freq_hz
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1956   .rodata.kFreqList.0:00000000 $d
+C:\Users\bubble\AppData\Local\Temp\cc3FffW9.s:1960   .rodata.kFreqList.0:00000000 kFreqList.0
+
+UNDEFINED SYMBOLS
+HAL_ADC_Stop_DMA
+HAL_ADC_Stop
+HAL_ADC_DeInit
+HAL_ADC_Init
+HAL_ADC_ConfigChannel
+memset
+HAL_ADC_Start_DMA
+hadc1
+HAL_ADC_Start
+HAL_ADC_PollForConversion
+HAL_ADC_GetValue
+BSP_AFE_GetRref
+BSP_AFE_GetPGAGain
+BSP_AFE_SetRref
+BSP_AFE_SetPGAGain
+BSP_AFE_GetRrefValue
+sqrtf
+atan2f
+AD9834_Set_Freq
+BSP_TIM4_SetFreq
+BSP_AFE_SetLPF
+BSP_AFE_Init
+AD9834_Init
+AD9834_Select_Wave
+BSP_TIM4_Init
+osMutexAcquire
+osMutexRelease
+Mutex_ResultHandle
+hadc2
+BSP_AFE_SetMeasureChannel
+osDelay
